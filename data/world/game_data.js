@@ -1,4 +1,6 @@
 window.OC_DATA = {
+  maxDay: 120,
+  storyMax: 30,
   origins: [
     { id: 'tingen', name: '廷根平民', desc: '你熟悉每条后巷，也熟悉面包涨价。', mods: { luck: 1, money: 2 }, flavor: '水仙花街的邻居记得你小时候的样子。' },
     { id: 'backlund', name: '贝克兰德中产', desc: '你读过书，也见过雾里的人怎么消失。', mods: { social: 1, money: 8 }, flavor: '你带着一只旧皮箱来到廷根，箱子里有一本没写完的日记。' },

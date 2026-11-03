@@ -1,6 +1,9 @@
 # 诡秘之主：廷根异闻
 
-OC AU 单机大世界沙盒的**八段垂直切片**：廷根 30 天 + 贝克兰德 14 天 + 海上 10 天 + 南大陆 8 天 + 战争 8 天 + 神弃之地 6 天 + 末日 5 天 + 源堡 5 天。
+OC AU 单机大世界沙盒的**八段长线垂直切片**：廷根 120 天 + 贝克兰德 180 天 + 海上 180 天 + 南大陆 120 天 + 战争 120 天 + 神弃之地 90 天 + 末日 60 天 + 源堡 45 天，共 915 天。
+
+**临时在线版：** <https://executor0707.github.io/tingen-oc-au/>  
+玩完请删除仓库；Pages 构建不含原作长段正文。
 
 ## 现在能玩什么
 
@@ -13,7 +16,9 @@ OC AU 单机大世界沙盒的**八段垂直切片**：廷根 30 天 + 贝克兰
 - 神弃之地 5 个地点：白银城、月城、巨人王庭、黑暗荒野、光之祭坛
 - 末日 5 个地点：贝克兰德废墟、星界、黑夜教堂、难民营地、门后
 - 源堡 5 个地点：源堡、灰雾、青铜长桌、门后、贝克兰德
-- 每天 2 个行动点；八地 80+ 地点行动；50 个街角事件
+- 每天 **5 个行动点**（上午 2 + 下午 3）；八地 80+ 地点行动；50 个街角事件
+- **微养成日常**：上课/自学、打工、训练、社交；属性成长，也可能认识次要 NPC
+- **长线日历**：915 天；可用“跳到下一事件”跳过日常
 - 每日报纸：canon 行踪 / 玩家影响 / 市井传闻
 - 50 个 canon 锚点（廷根 12 + 贝克兰德 12 + 海上 6 + 南大陆 5 + 战争 5 + 神弃之地 4 + 末日 3 + 源堡 3）；可旁观、接触、介入
 - 44 个委托；29 个 NPC 关系
@@ -59,6 +64,7 @@ node qa/forsaken.mjs    # 神弃之地 6 天 + 神弃之地结局
 node qa/apocalypse.mjs  # 末日 5 天 + 末日结局
 node qa/fool.mjs        # 源堡 5 天 + 最终结局
 node qa/archive.mjs     # 结局档案 + 110 canon 总表 + 人物档案
+node qa/ux.mjs          # 白昼/黑夜、5行动、微养成、字体缩放、掷骰、跳事件
 ```
 
 结果见 `qa/verification.json`、`qa/loop_result.json`、`qa/backlund_result.json`、`qa/sea_result.json`、`qa/south_result.json`、`qa/war_result.json`、`qa/forsaken_result.json`、`qa/apocalypse_result.json`、`qa/fool_result.json`、`qa/archive_result.json` 与 `qa/evidence/`。

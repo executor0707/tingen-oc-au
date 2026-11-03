@@ -11,7 +11,8 @@
     id: 'backlund',
     name: '贝克兰德',
     paper: '贝克兰德日报',
-    maxDay: 14,
+    maxDay: 180,
+    storyMax: 14,
     intro: '贝克兰德的雾比廷根厚。你换了名字，换了住处，但报纸还是每天送到门口。',
     locations: [
       { id: 'lodging', name: '东区出租屋', sub: '煤气灯、旧地毯与一封没拆的信', icon: 'home', color: '#b08a4a' },

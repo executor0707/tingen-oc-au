@@ -17,7 +17,8 @@
     name: '海上',
     paper: '海上新闻报',
     dateLabel: '1350 年 1 月',
-    maxDay: 10,
+    maxDay: 180,
+    storyMax: 10,
     intro: '罗思德群岛的风带着盐和血。你上了幽蓝复仇者号，海图上的空白比雾更危险。',
     locations: [
       { id: 'port', name: '罗思德群岛港口', sub: '湿漉漉的码头与没有名字的船', icon: 'factory', color: '#3e6b7a' },

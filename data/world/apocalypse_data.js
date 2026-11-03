@@ -9,7 +9,7 @@
   ];
 
   window.OC_APOCALYPSE = {
-    id: 'apocalypse', name: '末日', paper: '末日纪事', dateLabel: '1352 年 3 月', maxDay: 5,
+    id: 'apocalypse', name: '末日', paper: '末日纪事', dateLabel: '1352 年 3 月', maxDay: 60, storyMax: 5,
     intro: '天空裂开了。你从神弃之地走出来，发现末日不是一场爆炸，而是一扇慢慢打开的门。',
     locations: [
       { id: 'ruins', name: '贝克兰德废墟', sub: '裂缝、灰烬和不肯离开的人', icon: 'factory', color: '#8e2f3c' },

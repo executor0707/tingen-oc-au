@@ -16,7 +16,8 @@
     name: '战争',
     paper: '战时公报',
     dateLabel: '1351 年 2 月',
-    maxDay: 8,
+    maxDay: 120,
+    storyMax: 8,
     intro: '战争把所有人变成棋子。你从南大陆的热风里走进战壕，发现这里比墓地更安静。',
     locations: [
       { id: 'front', name: '前线战壕', sub: '泥、铁丝网和没有名字的死者', icon: 'shield', color: '#8e2f3c' },

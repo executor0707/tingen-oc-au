@@ -16,7 +16,8 @@
     name: '南大陆',
     paper: '南大陆殖民报',
     dateLabel: '1350 年 8 月',
-    maxDay: 8,
+    maxDay: 120,
+    storyMax: 8,
     intro: '拜朗的太阳很烈，死亡却很慢。你带着海上的潮气上岸，发现这里的死者比活人更守规矩。',
     locations: [
       { id: 'port', name: '拜朗港', sub: '送葬队伍、殖民官员与湿热的码头', icon: 'factory', color: '#b08a4a' },

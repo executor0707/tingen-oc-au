@@ -10,7 +10,7 @@
   ];
 
   window.OC_FORSAKEN = {
-    id: 'forsaken', name: '神弃之地', paper: '白银城石板报', dateLabel: '1351 年 9 月', maxDay: 6,
+    id: 'forsaken', name: '神弃之地', paper: '白银城石板报', dateLabel: '1351 年 9 月', maxDay: 90, storyMax: 6,
     intro: '这里没有太阳，只有人们自己点的灯。你从战争的烟尘里走进黑暗，发现黑暗并不空。',
     locations: [
       { id: 'white', name: '白银城', sub: '旧灯、石墙与不肯熄灭的人', icon: 'church', color: '#c9a35c' },

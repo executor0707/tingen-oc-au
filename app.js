@@ -17,6 +17,7 @@ const SAVE_KEY = 'tingen_oc_saves_v1';
 const SETTINGS_KEY = 'tingen_oc_settings_v1';
 const UNLOCK_KEY = 'tingen_oc_unlocked_endings_v1';
 
+const DAILY_AP = 5;
 const ATTR_LABEL = { spirit: '灵性', body: '体魄', insight: '洞察', social: '社交', luck: '运气' };
 const ATTR_ICON = { spirit: 'moon', body: 'shield', insight: 'eye', social: 'person', luck: 'spark' };
 const LOCATION_NPC = {
@@ -26,6 +27,16 @@ const LOCATION_NPC = {
   asylum: ['frye'],
   docks: [],
   church: ['frye']
+};
+const MINOR_POOL = {
+  tingen: ['rosa', 'frye', 'christina'],
+  backlund: ['tallim', 'glaint', 'forsth'],
+  sea: ['danz', 'frank'],
+  south: ['maric', 'doctor'],
+  war: ['medic', 'reporter'],
+  forsaken: ['colin', 'lovia'],
+  apocalypse: ['adam'],
+  fool: ['leonard']
 };
 
 function regionData() {
@@ -44,7 +55,15 @@ function regionNpcLocations() { return regionData().npcLocations || LOCATION_NPC
 function regionActions() { return regionData().actions || DATA.actions; }
 function regionCommissions() { return regionData().commissions || DATA.commissions; }
 function regionAmbient() { return regionData().ambient || DATA.ambient; }
-function regionCanon() { return regionData().canon || TINGEN_CANON; }
+function regionCanon() {
+  const base = regionData().canon || TINGEN_CANON;
+  const storyMax = regionData().storyMax || 30;
+  const max = (state && state.maxDay) || storyMax;
+  if (max === storyMax || storyMax <= 1) return base;
+  return base.map(e => Object.assign({}, e, {
+    dayStart: Math.max(1, Math.min(max, Math.round((e.dayStart - 1) / (storyMax - 1) * (max - 1)) + 1))
+  }));
+}
 function regionPaper() { return regionData().paper || '廷根老实人报'; }
 function paperMast() {
   if (state?.region === 'fool') return 'THE SEFIRAH GAZETTE';
@@ -77,7 +96,7 @@ let draft = null;
 let saves = [];
 let unlockedEndings = [];
 const ARCHIVE_TAB = { endings: '结局档案', canon: 'canon 总表', people: '人物档案' };
-let settings = { textScale: 1, motion: false };
+let settings = { textScale: 1, motion: false, theme: 'dark' };
 let modalAfter = null;
 let activeAmbient = null;
 let sessionStart = Date.now();
@@ -88,9 +107,11 @@ function freshState() {
     screen: 'title',
     region: 'tingen',
     act: 1,
-    maxDay: 30,
+    maxDay: 120,
     day: 1,
-    ap: 2,
+    ap: DAILY_AP,
+    morningAp: 2,
+    afternoonAp: 3,
     player: null,
     relations: {},
     flags: {},
@@ -103,7 +124,7 @@ function freshState() {
     log: [],
     ending: null,
     playtime: 0,
-    settings: { textScale: 1, motion: false },
+    settings: { textScale: 1, motion: false, theme: 'dark' },
     createdAt: Date.now()
   };
 }
@@ -130,10 +151,24 @@ function loadSettings() {
 }
 function applySettings() {
   document.documentElement.style.setProperty('--text-scale', String(settings.textScale || 1));
+  document.documentElement.style.setProperty('--read-scale', String(settings.textScale || 1));
   document.body.dataset.motion = settings.motion ? 'reduced' : '';
+  document.body.dataset.theme = settings.theme === 'light' ? 'light' : 'dark';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', settings.theme === 'light' ? '#f3ead6' : '#0b0d12');
 }
 function persistSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+}
+function setTheme(theme) {
+  settings.theme = theme === 'light' ? 'light' : 'dark';
+  if (state) state.settings.theme = settings.theme;
+  applySettings();
+  persistSettings();
+  render();
+}
+function toggleTheme() {
+  setTheme(settings.theme === 'light' ? 'dark' : 'light');
 }
 function loadSaves() {
   try {
@@ -182,6 +217,8 @@ function snapshot() {
     maxDay: state.maxDay,
     day: state.day,
     ap: state.ap,
+    morningAp: state.morningAp,
+    afternoonAp: state.afternoonAp,
     player: JSON.parse(JSON.stringify(state.player)),
     relations: JSON.parse(JSON.stringify(state.relations)),
     flags: JSON.parse(JSON.stringify(state.flags)),
@@ -297,6 +334,11 @@ function applyEffects(e = {}) {
   if (e.relations) for (const [k, v] of Object.entries(e.relations)) state.relations[k] = (state.relations[k] || 0) + v;
   if (e.flags) for (const [k, v] of Object.entries(e.flags)) if (v) state.flags[k] = true;
 }
+function spendAp() {
+  if (state.morningAp > 0) state.morningAp--;
+  else if (state.afternoonAp > 0) state.afternoonAp--;
+  state.ap = Math.max(0, (state.morningAp || 0) + (state.afternoonAp || 0));
+}
 function checkFailure() {
   if (!state.player) return false;
   if (state.player.health <= 0) { showEnding('dead'); return true; }
@@ -330,7 +372,7 @@ function renderTitle() {
           <button class="btn ghost" data-act="archive">${icon('stack')}档案库</button>
           <button class="btn ghost" data-act="about">${icon('book')}廷根指南</button>
         </div>
-        <div class="oc-meta"><span>八段 86 天 · 从廷根到源堡</span><span>序列 9 起步</span><span>50 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
+        <div class="oc-meta"><span>八段长线 915 天 · 从廷根到源堡</span><span>每日 5 行动</span><span>50 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
       </div>
       <div class="oc-paper-prop paper">
         <div class="prop-head"><span>THE TINGEN HONEST MAN</span><span>1 PENNY</span></div>
@@ -466,14 +508,35 @@ function buildPlayer() {
 function startDay(first = false) {
   if (!state.player) return;
   state.screen = 'hub';
-  state.ap = 2;
+  state.ap = DAILY_AP;
+  state.morningAp = 2;
+  state.afternoonAp = 3;
   state.ending = null;
+  state.maxDay = regionData().maxDay || state.maxDay || 120;
   const due = regionCanon().filter(e => e.dayStart === state.day);
   state.pendingCanon = due.map(e => e.id);
   state.newspaper = makeNewspaper(due);
   log(`第 ${state.day} 天开始。`);
   autoSave();
   render();
+}
+function skipToNextCanon() {
+  if (!state || !state.player) return;
+  const events = regionCanon();
+  const next = events.map(e => e.dayStart).filter(d => d > state.day).sort((a, b) => a - b)[0];
+  if (!next) { toast('这一段已经没有更晚的 canon 锚点了。', ''); return; }
+  const skipped = events.filter(e => e.dayStart > state.day && e.dayStart < next);
+  for (const e of skipped) if (!state.canonSeen.includes(e.id)) state.canonSeen.push(e.id);
+  state.day = next;
+  state.pendingCanon = [];
+  startDay();
+  toast(`时间推进到第 ${next} 天。`, 'good');
+}
+function debugSetDay(n) {
+  if (!state) return;
+  state.day = clamp(Number(n) || 1, 1, state.maxDay || 120);
+  state.pendingCanon = [];
+  startDay();
 }
 function makeNewspaper(due) {
   const p = state.player;
@@ -537,13 +600,14 @@ function hud() {
     <button class="oc-brand" data-act="title">${icon('moon')}<span>${regionLabel()}异闻<small>DAY ${String(state.day).padStart(2, '0')} / ${state.maxDay || 30}</small></span></button>
     <div class="hud-day"><b>${String(state.day).padStart(2, '0')}</b><span>日 / ${state.maxDay || 30}</span></div>
     <div class="hud-res">
-      <span class="res"><i>${icon('spark')}</i>行动 ${state.ap}/2</span>
+      <span class="res" title="上午 2 行动 · 下午 3 行动"><i>${icon('spark')}</i>行动 ${state.ap}/${DAILY_AP}<small>上午 ${state.morningAp || 0} · 下午 ${state.afternoonAp || 0}</small></span>
       <span class="res money" title="金钱">${icon('star')}${p.money} 镑</span>
       <span class="res health" title="生命">${icon('heart')}${p.health}/10</span>
       <span class="res madness" title="疯狂">${icon('drop')}${p.madness}/10</span>
     </div>
     <div class="hud-actions">
       <button class="icon-btn" data-act="newspaper" title="今日报纸">${icon('book')}</button>
+      <button class="icon-btn theme-toggle" data-act="theme-toggle" title="${settings.theme === 'light' ? '切换到黑夜' : '切换到白昼'}">${icon(settings.theme === 'light' ? 'moon' : 'spark')}</button>
       <button class="icon-btn" data-act="save" title="存档">${icon('save')}</button>
       <button class="icon-btn" data-act="saves" title="存档柜">${icon('folder')}</button>
       <button class="icon-btn" data-act="settings" title="设置">${icon('settings')}</button>
@@ -604,12 +668,13 @@ function renderHub() {
     <section class="hub-center">
       <div class="hub-head"><div><p class="kicker">${regionLabel().toUpperCase()} · DAY ${state.day}</p><h1>今天去哪里？</h1></div><div class="ap-display"><b>${state.ap}</b><span>行动点</span></div></div>
       <div class="map-grid">${locCards}</div>
-      <div class="hub-hint">${state.ap > 0 ? '选择一个地点行动。用完 2 个行动点后进入夜晚。' : '行动点用完了。回水仙花街休息，或直接结束今天。'}</div>
+      <div class="hub-hint">${state.ap > 0 ? `选择一个地点行动。今天还有 ${state.ap} 个行动点；也可用日常安排上课/打工/训练。` : '行动点用完了。回水仙花街休息，或直接结束今天。'}</div>
       <div class="hub-bottom">
         <button class="btn ghost small" data-act="open-commission">${icon('star')}委托板</button>
         <button class="btn ghost small" data-act="relations">${icon('heart')}关系档案</button>
         <button class="btn ghost small" data-act="canon-list">${icon('eye')}canon 追踪</button>
         <button class="btn ghost small" data-act="archive">${icon('stack')}档案库</button>
+        <button class="btn ghost small" data-act="skip-canon">${icon('clock')}跳到下一事件</button>
         <span class="spacer"></span>
         <button class="btn ${state.ap <= 0 ? 'primary' : 'ghost'} small" data-act="end-day">${icon('moon')}结束今天</button>
       </div>
@@ -757,7 +822,20 @@ function openLocation(id) {
     </button>`);
   }
   const ambient = regionAmbient().filter(a => a.location === id);
-  if (ambient.length) extras.push(`<button class="action-row" data-act="wander" data-loc="${id}" ${state.ap <= 0 ? 'disabled' : ''}><span class="action-name">${icon('search')}在附近转转</span><span class="action-desc">不一定发生什么，但廷根从不缺怪事。</span><span class="action-cost">1 行动</span></button>`);
+  const daily = [
+    { id: 'study', name: '去上课 / 自学', desc: '读书、做笔记，或者听一堂听不懂的课。', check: '洞察 DC 8', effects: '洞察 +1' },
+    { id: 'work', name: '打零工', desc: '搬货、跑腿、洗盘子。钱不多，但能活。', check: '体魄 DC 8', effects: '金钱 +4 · 体魄 +1 · 生命 -1' },
+    { id: 'train', name: '训练', desc: '跑步、举重、练习拔枪。', check: '体魄 DC 9', effects: '体魄 +1 · 生命 -1' },
+    { id: 'social', name: '社交 / 认识人', desc: '去酒馆、沙龙或教堂，和陌生人说话。', check: '社交 DC 8', effects: '社交 +1 · 声望 +1 · 可能认识次要 NPC' }
+  ];
+  extras.push(`<div class="daily-divider">日常安排 · 微养成</div>`);
+  for (const d of daily) {
+    extras.push(`<button class="action-row daily-action" data-act="daily" data-loc="${id}" data-id="${d.id}" ${state.ap <= 0 ? 'disabled' : ''}>
+      <span class="action-name">${icon(d.id === 'study' ? 'book' : d.id === 'work' ? 'star' : d.id === 'train' ? 'shield' : 'heart')}${d.name}<span class="action-check">${d.check}</span></span>
+      <span class="action-desc">${d.desc}</span><span class="action-cost">1 行动</span>
+    </button>`);
+  }
+  if (ambient.length) extras.push(`<button class="action-row" data-act="wander" data-loc="${id}" ${state.ap <= 0 ? 'disabled' : ''}><span class="action-name">${icon('search')}在附近转转</span><span class="action-desc">不一定发生什么，但${regionLabel()}从不缺怪事。</span><span class="action-cost">1 行动</span></button>`);
   openModal(`<div class="modal wide location-modal">
     <div class="modal-head"><span class="head-icon" style="border-color:${loc.color};color:${loc.color}">${icon(loc.icon)}</span><div><h2>${esc(loc.name)}</h2><p class="modal-sub">${esc(loc.sub)} · 第 ${state.day} 天 · 剩余 ${state.ap} 行动</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body">
@@ -765,7 +843,7 @@ function openLocation(id) {
       ${npcs.length ? `<div class="npc-strip">${npcs.map(n => `<button class="npc-card" data-act="npc" data-id="${n.id}" style="--c:${n.color}"><span class="npc-avatar">${esc(n.name[0])}</span><span><b>${esc(n.name)}</b><small>${esc(n.role)}</small></span><em>${relLabel(state.relations[n.id] || 0)}</em></button>`).join('')}</div>` : ''}
       <div class="action-list">${rows}${extras.join('')}</div>
     </div>
-    <div class="modal-foot"><span class="small" style="color:#6d5740">行动点 ${state.ap}/2 · 生命 ${state.player.health}/10 · 疯狂 ${state.player.madness}/10</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">先不行动</button></div>
+    <div class="modal-foot"><span class="small" style="color:#6d5740">行动点 ${state.ap}/${DAILY_AP} · 生命 ${state.player.health}/10 · 疯狂 ${state.player.madness}/10</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">先不行动</button></div>
   </div>`, {});
 }
 function locationFlavor(id) {
@@ -835,9 +913,44 @@ function locationFlavor(id) {
   if (state.region === 'sea') return sea[id] || '';
   return (state.region === 'backlund' ? backlund[id] : map[id]) || '';
 }
+function dailyDefinition(id) {
+  return {
+    study: { title: '上课 / 自学', attr: 'insight', dc: 8, effects: { insight: 1 }, fail: { madness: 1 }, text: '你读了一下午的书。窗外的雾散了又聚，笔记写满了三页。' },
+    work: { title: '打零工', attr: 'body', dc: 8, effects: { money: 4, body: 1, health: -1 }, fail: { money: 2, health: -1 }, text: '你干了一天的活。工头把零钱拍在你手里，没有多说什么。' },
+    train: { title: '训练', attr: 'body', dc: 9, effects: { body: 1, health: -1 }, fail: { health: -2 }, text: '你练到手臂发抖。至少下一次拔枪会快一点。' },
+    social: { title: '社交 / 认识人', attr: 'social', dc: 8, effects: { social: 1, reputation: 1 }, fail: { notoriety: 1 }, text: '你在人群里坐了一会儿，听见几个名字，也被人记住了脸。' }
+  }[id];
+}
+function doDaily(locId, id) {
+  if (!state.player) return;
+  if (state.ap <= 0) { toast('今天的行动点用完了。', 'danger'); return; }
+  const d = dailyDefinition(id);
+  if (!d) return;
+  spendAp();
+  state._lastLocation = locId;
+  const check = roll(d.attr, d.dc, `daily:${locId}:${id}:${state.day}`);
+  const effects = Object.assign({}, check.success ? d.effects : d.fail);
+  let text = check.success ? d.text : '你试了，但今天状态不太好。';
+  if (id === 'social') {
+    const pool = MINOR_POOL[state.region] || [];
+    const rng = seeded(`${state.player.name}:${state.day}:minor:${state.ap}`);
+    const minorId = pool[Math.floor(rng() * pool.length)];
+    const minor = allNpcs().find(n => n.id === minorId);
+    if (minor && check.success) {
+      effects.relations = { [minor.id]: 1 };
+      text = `你在人群里遇见了${minor.name}。你们聊了几句，对方记住了你的脸。`;
+    }
+  }
+  applyEffects(effects);
+  log(`${locationName(locId)}：${d.title}${check.success ? '（成功）' : '（失败）'}`);
+  if (checkFailure()) return;
+  autoSave();
+  showActionResult(d.title, text, effects, check, () => { if (state.ap <= 0) openNight(); else renderHub(); });
+}
 function performAction(locId, actionId) {
   if (!state.player) return;
   if (state.ap <= 0) { toast('今天的行动点用完了。', 'danger'); return; }
+  if (actionId.startsWith('daily-')) { doDaily(locId, actionId.slice(6)); return; }
   const action = (regionActions()[locId] || []).find(a => a.id === actionId);
   if (!action) return;
   if (action.openBoard) { openCommissionBoard(); return; }
@@ -846,7 +959,7 @@ function performAction(locId, actionId) {
     if (state.day < gate) { toast(`你还没有攒够退出的勇气。第 ${gate} 天以后再来。`, 'danger'); return; }
     openRetire(); return;
   }
-  state.ap--;
+  spendAp();
   state._lastLocation = locId;
   let success = true, check = null;
   if (action.check) {
@@ -872,7 +985,10 @@ function failureText(action, check) {
   return '运气没有站在你这边。你只拿到了一半的答案。';
 }
 function showActionResult(title, text, effects, check, after) {
-  const checkHtml = check ? `<div class="check-line ${check.success ? 'ok' : 'fail'}">${icon(check.success ? 'spark' : 'drop')} ${attrName(check.attr)}判定：d6 ${check.d6} + ${state.player.attrs[check.attr]}（+${check.bonus}）= ${check.total} / DC ${check.dc} · ${check.success ? '成功' : '失败'}</div>` : '';
+  const checkHtml = check ? `<div class="check-line ${check.success ? 'ok' : 'fail'}">
+    <div class="check-die-wrap"><span class="check-die" data-face="${check.d6}">${check.d6}</span><span class="die-label">d6</span></div>
+    <div class="check-math"><span>${attrName(check.attr)}判定</span><b>${check.d6} + ${state.player.attrs[check.attr]}${check.bonus ? ` + ${check.bonus}` : ''} = ${check.total}</b><small>DC ${check.dc} · ${check.success ? '成功' : '失败'}</small></div>
+  </div>` : '';
   openModal(`<div class="modal narrow">
     <div class="modal-head"><span class="head-icon">${icon(check && !check.success ? 'drop' : 'feather')}</span><div><h2>${esc(title)}</h2><p class="modal-sub">第 ${state.day} 天 · ${esc(locationName(state._lastLocation || 'home'))}</p></div><button class="modal-close" data-act="close-result">${icon('close')}</button></div>
     <div class="modal-body"><p class="scene-text">${esc(text)}</p>${checkHtml}<div class="effect-tags">${effectTags(effects)}</div><div class="result-note">${state.ap <= 0 ? '行动点用完了。接下来是夜晚。' : `还剩 ${state.ap} 个行动点。`}</div></div>
@@ -1019,7 +1135,7 @@ function openCanon(id) {
       <p class="scene-text">你可以介入，也可以只是看着。无论选什么，这件事都会留下记录。</p>
       <div class="choice-list">${choices.map((c, i) => `<button class="oc-choice" data-act="canon-choice" data-id="${id}" data-i="${i}" ${state.ap <= 0 ? 'disabled' : ''}><span>${esc(c.label)}</span><small>${esc(c.hint || '')}</small><em>${effectTags(c.effects)} ${c.check ? `<span class="action-check">${attrName(c.check.attr)} DC ${c.check.dc}</span>` : ''}</em></button>`).join('')}</div>
     </div>
-    <div class="modal-foot"><span class="small" style="color:#6d5740">介入消耗 1 行动点 · 剩余 ${state.ap}/2</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再想想</button></div>
+    <div class="modal-foot"><span class="small" style="color:#6d5740">介入消耗 1 行动点 · 剩余 ${state.ap}/${DAILY_AP}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再想想</button></div>
   </div>`);
 }
 function chooseCanon(id, i) {
@@ -1028,7 +1144,7 @@ function chooseCanon(id, i) {
   const choices = canonChoices(e);
   const c = choices[i];
   if (!c) return;
-  state.ap--;
+  spendAp();
   let success = true, check = null;
   if (c.check) { check = roll(c.check.attr, c.check.dc, `canon:${id}:${i}`); success = check.success; }
   const effects = success ? (c.effects || {}) : Object.assign({}, c.effects || {}, { madness: 1, notoriety: 1 });
@@ -1087,7 +1203,7 @@ function resolveCommission() {
   const c = state.activeCommission;
   if (!c) return;
   if (state.ap <= 0) { toast('今天的行动点用完了。', 'danger'); return; }
-  state.ap--;
+  spendAp();
   const check = roll(c.check.attr, c.check.dc, `commission:${c.id}`);
   if (check.success) {
     applyEffects({ money: c.reward, reputation: c.rep || 0, notoriety: c.notoriety || 0, relations: c.relations || {}, madness: c.madness || 0, humanity: c.humanity || 0 });
@@ -1127,7 +1243,7 @@ function openNight() {
       </div>
       <p class="small muted">缺陷「${esc(state.player.flawName)}」会在夜间生效。</p>
     </div>
-    <div class="modal-foot"><span class="small" style="color:#6d5740">剩余行动点 ${state.ap}/2 · 结束后进入第 ${state.day + 1} 天</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再等等</button></div>
+    <div class="modal-foot"><span class="small" style="color:#6d5740">剩余行动点 ${state.ap}/${DAILY_AP} · 结束后进入第 ${state.day + 1} 天</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再等等</button></div>
   </div>`);
 }
 function chooseNight(id) {
@@ -1151,7 +1267,9 @@ function startAct(region, act, maxDay) {
   state.act = act;
   state.maxDay = maxDay;
   state.day = 1;
-  state.ap = 2;
+  state.ap = DAILY_AP;
+  state.morningAp = 2;
+  state.afternoonAp = 3;
   state.activeCommission = null;
   state.pendingCanon = [];
   state.newspaper = [];
@@ -1164,13 +1282,13 @@ function startAct(region, act, maxDay) {
   startDay(true);
   toast(region === 'fool' ? '第八段：愚者。最后一页。' : region === 'apocalypse' ? '第七段：末日。门在打开。' : region === 'forsaken' ? '第六段：神弃之地。灯还亮着。' : region === 'war' ? '第五段：战争。红祭司在看着你。' : region === 'south' ? '第四段：南大陆。死人比活人守规矩。' : region === 'sea' ? '第三段：海上。风比雾更硬。' : '第二段：贝克兰德。雾比廷根厚。', 'good');
 }
-function startBacklund() { startAct('backlund', 2, 14); }
-function startSea() { startAct('sea', 3, 10); }
-function startSouth() { startAct('south', 4, 8); }
-function startWar() { startAct('war', 5, 8); }
-function startForsaken() { startAct('forsaken', 6, 6); }
-function startApocalypse() { startAct('apocalypse', 7, 5); }
-function startFool() { startAct('fool', 8, 5); }
+function startBacklund() { startAct('backlund', 2, 180); }
+function startSea() { startAct('sea', 3, 180); }
+function startSouth() { startAct('south', 4, 120); }
+function startWar() { startAct('war', 5, 120); }
+function startForsaken() { startAct('forsaken', 6, 90); }
+function startApocalypse() { startAct('apocalypse', 7, 60); }
+function startFool() { startAct('fool', 8, 45); }
 
 /* ---------- endings ---------- */
 function showEnding(id) {
@@ -1249,13 +1367,13 @@ function wander(locId) {
   const rng = seeded(`${state.player.name}:${state.day}:wander:${locId}`);
   const amb = pool[Math.floor(rng() * pool.length)];
   activeAmbient = amb;
-  state.ap--;
+  spendAp();
   state._lastLocation = locId;
   log(`${locationName(locId)}：在附近转转`);
   openModal(`<div class="modal narrow">
     <div class="modal-head"><span class="head-icon">${icon('search')}</span><div><h2>街角见闻</h2><p class="modal-sub">${esc(locationName(locId))} · 第 ${state.day} 天</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><p class="scene-text">${esc(amb.text)}</p><div class="choice-list">${amb.choices.map((c, i) => `<button class="oc-choice" data-act="ambient-choice" data-i="${i}"><span>${esc(c.label)}</span><small>${effectTags(c.effects)}</small></button>`).join('')}</div></div>
-    <div class="modal-foot"><span class="small" style="color:#6d5740">行动点 ${state.ap}/2</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">离开</button></div>
+    <div class="modal-foot"><span class="small" style="color:#6d5740">行动点 ${state.ap}/${DAILY_AP}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">离开</button></div>
   </div>`, () => { if (state.ap <= 0) openNight(); else renderHub(); });
 }
 function chooseAmbient(i) {
@@ -1322,7 +1440,10 @@ async function loadSave(id) {
   const s = saveById(id);
   if (!s) return;
   state = Object.assign(freshState(), JSON.parse(JSON.stringify(s.snapshot)));
-  state.maxDay = state.maxDay || (state.region === 'backlund' ? 14 : 30);
+  state.maxDay = state.maxDay || regionData().maxDay || 120;
+  if (state.morningAp === undefined) { state.morningAp = Math.min(2, state.ap || 0); state.afternoonAp = Math.max(0, (state.ap || 0) - state.morningAp); }
+  settings = Object.assign({}, settings, state.settings || {});
+  applySettings();
   state.screen = state.ending ? 'ending' : 'hub';
   state._lastTick = 0;
   sessionStart = Date.now();
@@ -1377,24 +1498,25 @@ function openSettings() {
   openModal(`<div class="modal narrow">
     <div class="modal-head"><span class="head-icon">${icon('settings')}</span><div><h2>设置</h2><p class="modal-sub">阅读与本地数据</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><div class="settings-grid">
-      <div class="setting-row"><div><div class="s-label">字号</div><div class="s-desc">只影响文字，不改变地图布局。</div></div><div class="font-btns">${[1, 1.15, 1.3].map(v => `<button class="${settings.textScale === v ? 'on' : ''}" data-act="font-size" data-size="${v}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
-      <div class="setting-row"><div><div class="s-label">减少动效</div><div class="s-desc">关闭长过渡与闪烁。</div></div><button class="switch ${settings.motion ? 'on' : ''}" data-act="toggle-motion"></button></div>
+      <div class="setting-row"><div><div class="s-label">字体大小</div><div class="s-desc">放大正文和主要界面文字，不改变地图列数。</div></div><div class="font-btns">${[1, 1.15, 1.3].map(v => `<button class="${settings.textScale === v ? 'on' : ''}" data-act="font-size" data-size="${v}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
+      <div class="setting-row"><div><div class="s-label">主题</div><div class="s-desc">白昼模式使用浅色纸面与深色文字；黑夜模式保持红月档案感。</div></div><div class="font-btns"><button class="${settings.theme !== 'light' ? 'on' : ''}" data-act="theme" data-theme="dark">黑夜</button><button class="${settings.theme === 'light' ? 'on' : ''}" data-act="theme" data-theme="light">白昼</button></div></div>
+      <div class="setting-row"><div><div class="s-label">减少动效</div><div class="s-desc">关闭长过渡、掷骰旋转与闪烁。</div></div><button class="switch ${settings.motion ? 'on' : ''}" data-act="toggle-motion"></button></div>
       <div class="setting-row"><div><div class="s-label">存档</div><div class="s-desc">导出 JSON，或从备份导入。</div></div><div style="display:flex;gap:5px"><button class="btn ghost small" data-act="export-saves">${icon('download')}导出</button><button class="btn ghost small" data-act="pick-import">${icon('upload')}导入</button></div></div>
-      <div class="setting-row"><div><div class="s-label">版本</div><div class="s-desc">八段 86 天 · 50 个 canon 锚点 · 本地运行</div></div><span class="tag">v0.8</span></div>
+      <div class="setting-row"><div><div class="s-label">版本</div><div class="s-desc">八段长线 915 天 · 每日 5 行动 · 早/午/晚 2+3 安排 · 50 个 canon 锚点</div></div><span class="tag">v0.9</span></div>
     </div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">本作是 OC AU 同人；不含原作长段正文。</span><span class="spacer"></span><button class="btn primary small" data-act="close-modal">完成</button></div>
   </div>`, {});
 }
 function openAbout() {
   openModal(`<div class="modal">
-    <div class="modal-head"><span class="head-icon">${icon('moon')}</span><div><h2>八段旅程指南</h2><p class="modal-sub">OC AU · 86 天</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-head"><span class="head-icon">${icon('moon')}</span><div><h2>八段旅程指南</h2><p class="modal-sub">OC AU · 915 天长线 · 每日 5 行动</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body">
-      <p class="scene-text">你是一个原创非凡者。每天有 2 个行动点；读报纸，去地点，接委托，和 NPC 说话。canon 事件会在固定日期发生，你可以旁观、接触或直接介入。廷根第 30 天去贝克兰德，第 14 天出海，第 10 天南下，第 8 天去前线，第 6 天进入神弃之地，第 5 天走向末日，第 5 天进入源堡。</p>
+      <p class="scene-text">你是一个原创非凡者。每天有 5 个行动点：可以去上课、打工、训练、社交，也可以读报纸、接委托、和 NPC 说话。canon 事件会在日历上的固定日期发生；时间线按原作跨度拉长，可以用“跳到下一事件”跳过日常。</p>
       <div class="help-list">
         <div class="help-item"><span class="h-num">1</span><div><h4>报纸</h4><p>每天早上更新：canon 行踪、玩家影响、市井传闻。报纸可能滞后，也可能撒谎。</p></div></div>
         <div class="help-item"><span class="h-num">2</span><div><h4>判定</h4><p>属性 + d6。失败也会留下后果。占卜家/收尸人有特定判定加成。</p></div></div>
         <div class="help-item"><span class="h-num">3</span><div><h4>canon 事件</h4><p>每个锚点都有“介入”窗口。介入消耗 1 行动点，会改写后续报纸与结局。</p></div></div>
-        <div class="help-item"><span class="h-num">4</span><div><h4>结局</h4><p>第 30 天结算。普通人结局不是失败：开花店、当区长、回大学教书，都是活法。</p></div></div>
+        <div class="help-item"><span class="h-num">4</span><div><h4>长线与结局</h4><p>每段有独立的结算日；可以用“跳到下一事件”跳过日常。普通人结局不是失败：开花店、当区长、回大学教书，都是活法。</p></div></div>
       </div>
       <div class="scene-note" style="margin-top:12px">非官方、非商业同人。原作权利归爱潜水的乌贼及相关权利方所有。存档只在本机。</div>
     </div>
@@ -1572,7 +1694,7 @@ function init() {
     getScreen: () => state.screen,
     newGame, render, startDay, openLocation, performAction, openCanon, chooseCanon,
     openCommissionBoard, acceptCommission, resolveCommission, openFinal, showEnding,
-    startBacklund, startSea, startSouth, startWar, startForsaken, startApocalypse, startFool, saveGame, loadSave, day: () => state.day, region: () => state.region
+    startBacklund, startSea, startSouth, startWar, startForsaken, startApocalypse, startFool, skipToNextCanon, debugSetDay, saveGame, loadSave, day: () => state.day, region: () => state.region
   };
 }
 document.addEventListener('click', (e) => {
@@ -1603,6 +1725,7 @@ document.addEventListener('click', (e) => {
   if (act === 'create-start') { buildPlayer(); return; }
   if (act === 'open-location') { openLocation(el.dataset.id); return; }
   if (act === 'do-action') { performAction(el.dataset.loc, el.dataset.id); return; }
+  if (act === 'daily') { performAction(el.dataset.loc, 'daily-' + el.dataset.id); return; }
   if (act === 'wander') { wander(el.dataset.loc); return; }
   if (act === 'ambient-choice') { chooseAmbient(Number(el.dataset.i)); return; }
   if (act === 'open-canon') { openCanon(el.dataset.id); return; }
@@ -1611,6 +1734,7 @@ document.addEventListener('click', (e) => {
   if (act === 'open-commission') { openCommissionBoard(); return; }
   if (act === 'accept-commission') { acceptCommission(el.dataset.id); return; }
   if (act === 'resolve-commission') { resolveCommission(); return; }
+  if (act === 'skip-canon') { skipToNextCanon(); return; }
   if (act === 'end-day') { openNight(); return; }
   if (act === 'night-choice') { chooseNight(el.dataset.id); return; }
   if (act === 'pick-ending') { showEnding(el.dataset.id); return; }
@@ -1627,6 +1751,8 @@ document.addEventListener('click', (e) => {
   if (act === 'relations') { openRelations(); return; }
   if (act === 'newspaper') { openNewspaper(); return; }
   if (act === 'font-size') { settings.textScale = Number(el.dataset.size); state.settings.textScale = settings.textScale; applySettings(); persistSettings(); openSettings(); return; }
+  if (act === 'theme') { setTheme(el.dataset.theme); openSettings(); return; }
+  if (act === 'theme-toggle') { toggleTheme(); return; }
   if (act === 'toggle-motion') { settings.motion = !settings.motion; state.settings.motion = settings.motion; applySettings(); persistSettings(); openSettings(); return; }
 });
 document.addEventListener('change', (e) => {

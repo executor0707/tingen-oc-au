@@ -9,7 +9,7 @@
   ];
 
   window.OC_FOOL = {
-    id: 'fool', name: '愚者', paper: '源堡无报', dateLabel: '1352 年 9 月', maxDay: 5,
+    id: 'fool', name: '愚者', paper: '源堡无报', dateLabel: '1352 年 9 月', maxDay: 45, storyMax: 5,
     intro: '你走到了最后一页。源堡的门开着，灰雾很轻，像有人替你留了一盏灯。',
     locations: [
       { id: 'sefirah', name: '源堡', sub: '灰雾、钟声与看不见的台阶', icon: 'castle', color: '#c9a35c' },
