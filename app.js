@@ -29,7 +29,9 @@ const LOCATION_NPC = {
 };
 
 function regionData() {
-  return (state && state.region === 'backlund' && window.OC_BACKLUND) ? window.OC_BACKLUND : DATA;
+  if (state && state.region === 'sea' && window.OC_SEA) return window.OC_SEA;
+  if (state && state.region === 'backlund' && window.OC_BACKLUND) return window.OC_BACKLUND;
+  return DATA;
 }
 function regionLocations() { return regionData().locations || DATA.locations; }
 function regionNPCs() { return regionData().npcs || DATA.npcs; }
@@ -39,17 +41,25 @@ function regionCommissions() { return regionData().commissions || DATA.commissio
 function regionAmbient() { return regionData().ambient || DATA.ambient; }
 function regionCanon() { return regionData().canon || TINGEN_CANON; }
 function regionPaper() { return regionData().paper || '廷根老实人报'; }
-function regionMaxDay() { return (state && state.region === 'backlund') ? 14 : 30; }
-function regionLabel() { return (state && state.region === 'backlund') ? '贝克兰德' : '廷根'; }
-function regionDateLabel() { return (state && state.region === 'backlund') ? '1349 年 9 月' : '1349 年 7 月'; }
+function paperMast() {
+  if (state?.region === 'sea') return 'THE SEA HERALD';
+  if (state?.region === 'backlund') return 'THE BACKLUND DAILY';
+  return 'THE TINGEN HONEST MAN';
+}
+function regionMaxDay() { return regionData().maxDay || state?.maxDay || 30; }
+function regionLabel() { return regionData().name || '廷根'; }
+function regionDateLabel() { return regionData().dateLabel || (state?.region === 'backlund' ? '1349 年 9 月' : '1349 年 7 月'); }
 function regionEndings() {
   const base = DATA.endings;
-  const extra = (window.OC_BACKLUND && window.OC_BACKLUND.endings) || { ordinary: [], core: [] };
-  return {
-    ordinary: [].concat(base.ordinary, extra.ordinary || []),
-    core: [].concat(base.core, extra.core || []),
-    bad: base.bad
-  };
+  const out = { ordinary: base.ordinary.slice(), core: base.core.slice(), bad: base.bad.slice() };
+  for (const key of ['backlund', 'sea']) {
+    const d = window[key === 'backlund' ? 'OC_BACKLUND' : 'OC_SEA'];
+    if (d && d.endings) {
+      out.ordinary.push(...(d.endings.ordinary || []));
+      out.core.push(...(d.endings.core || []));
+    }
+  }
+  return out;
 }
 
 let state = null;
@@ -138,8 +148,9 @@ function unlockEnding(id) {
 }
 function allEndings() {
   const b = (window.OC_BACKLUND && window.OC_BACKLUND.endings) || { ordinary: [], core: [] };
+  const s = (window.OC_SEA && window.OC_SEA.endings) || { ordinary: [], core: [] };
   const seen = new Set();
-  return [].concat(DATA.endings.ordinary, b.ordinary || [], DATA.endings.core, b.core || [], DATA.endings.bad)
+  return [].concat(DATA.endings.ordinary, b.ordinary || [], s.ordinary || [], DATA.endings.core, b.core || [], s.core || [], DATA.endings.bad)
     .filter(e => { if (!e || seen.has(e.id)) return false; seen.add(e.id); return true; });
 }
 function updatePlaytime() {
@@ -304,7 +315,7 @@ function renderTitle() {
           <button class="btn ghost" data-act="archive">${icon('stack')}档案库</button>
           <button class="btn ghost" data-act="about">${icon('book')}廷根指南</button>
         </div>
-        <div class="oc-meta"><span>廷根 30 天 + 贝克兰德 14 天</span><span>序列 9 起步</span><span>24 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
+        <div class="oc-meta"><span>廷根 30 天 + 贝克兰德 14 天 + 海上 10 天</span><span>序列 9 起步</span><span>30 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
       </div>
       <div class="oc-paper-prop paper">
         <div class="prop-head"><span>THE TINGEN HONEST MAN</span><span>1 PENNY</span></div>
@@ -455,7 +466,9 @@ function makeNewspaper(due) {
   if (due && due.length) {
     news.push({ tag: 'CANON', text: due[0].newspaper, eventId: due[0].id });
   } else {
-    news.push({ tag: '本报', text: state.region === 'backlund'
+    news.push({ tag: '本报', text: state.region === 'sea'
+      ? '罗思德群岛港口昨夜有船无灯入港；港务局称“只是晚归的渔船”。'
+      : state.region === 'backlund'
       ? '贝克兰德桥区昨夜发生瓦斯泄漏；东区居民称雾里有人唱歌。'
       : '黑荆棘安保公司称昨夜“只是加班”；佐特兰街居民表示已经习惯了。' });
   }
@@ -472,7 +485,9 @@ function makeNewspaper(due) {
   } else if (p.reputation >= 4) {
     news.push({ tag: '社交', text: `本城一位“热心的${p.pathwayName}”最近很活跃；有人称赞，有人警惕。` });
   } else {
-    news.push({ tag: '传闻', text: state.region === 'backlund'
+    news.push({ tag: '传闻', text: state.region === 'sea'
+      ? '水手称风暴眼里有灯；航运公司称“不建议靠近”。'
+      : state.region === 'backlund'
       ? '皇后区沙龙称，雾霾只是“天气问题”；东区诊所没有置评。'
       : '占卜俱乐部称，红月最近“只是天气现象”；教会未予置评。' });
   }
@@ -530,7 +545,7 @@ function renderHub() {
   <main class="hub-layout">
     <aside class="hub-left">
       <section class="newspaper-card paper">
-        <div class="paper-mast"><span>${state.region === 'backlund' ? 'THE BACKLUND DAILY' : 'THE TINGEN HONEST MAN'}</span><span>1 PENNY</span></div>
+        <div class="paper-mast"><span>${paperMast()}</span><span>1 PENNY</span></div>
         <h2>${esc(regionPaper())}</h2>
         <div class="paper-date">${regionDateLabel()} · 第 ${state.day} 天</div>
         ${newspaper}
@@ -592,6 +607,13 @@ function relLabel(r) {
 function locationName(id) { const l = regionLocations().find(x => x.id === id); return l ? l.name : id; }
 function canonLocationId(e) {
   const s = (e.location || '') + (e.title || '');
+  if (state.region === 'sea') {
+    if (s.includes('黑市') || s.includes('市场')) return 'market';
+    if (s.includes('无人岛') || s.includes('岛')) return 'island';
+    if (s.includes('风暴') || s.includes('海眼')) return 'storm';
+    if (s.includes('船') || s.includes('复仇者')) return 'ship';
+    return 'port';
+  }
   if (state.region === 'backlund') {
     if (s.includes('东区') || s.includes('码头') || s.includes('塔索克')) return 'docks';
     if (s.includes('皇后区') || s.includes('西区') || s.includes('沙龙')) return 'west';
@@ -613,7 +635,7 @@ function openNewspaper() {
   const rows = state.newspaper.map(n => `<div class="news-line"><span class="news-tag">${esc(n.tag)}</span><p>${esc(n.text)}</p></div>`).join('');
   openModal(`<div class="modal narrow newspaper-modal">
     <div class="modal-head"><span class="head-icon">${icon('book')}</span><div><h2>${esc(regionPaper())}</h2><p class="modal-sub">${regionDateLabel()} · 第 ${state.day} 天 · 1 便士</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
-    <div class="modal-body"><div class="paper-mast"><span>${state.region === 'backlund' ? 'THE BACKLUND DAILY' : 'THE TINGEN HONEST MAN'}</span><span>1 PENNY</span></div>${rows}<div class="prop-small">分类广告：占卜、寻物、保镖、葬礼花圈。价格面议。</div></div>
+    <div class="modal-body"><div class="paper-mast"><span>${paperMast()}</span><span>1 PENNY</span></div>${rows}<div class="prop-small">分类广告：占卜、寻物、保镖、葬礼花圈。价格面议。</div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">报纸只写它“知道”的，不写它“猜到”的。</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起报纸</button></div>
   </div>`);
 }
@@ -693,6 +715,14 @@ function locationFlavor(id) {
     church: '黑夜教堂的彩窗把雾滤成灰色。告解室的门半掩着，里面没有声音。',
     university: '贝克兰德大学的旧书库有霉味。管理员说，最里面那排书“不建议借阅”。'
   };
+  const sea = {
+    port: '罗思德群岛的港口永远湿漉漉的。水手、商人和没有名字的船挤在同一个码头。',
+    ship: '幽蓝复仇者号的甲板在夜里发出轻响。船长室的灯亮着，海图铺了一桌。',
+    market: '黑市藏在两条巷子之间。这里卖的东西，有一半不该存在。',
+    island: '无人岛很小，沙滩上只有脚印，没有离开的痕迹。',
+    storm: '风暴眼像一只闭着的眼睛。船身在响，罗盘在转，所有人都很安静。'
+  };
+  if (state.region === 'sea') return sea[id] || '';
   return (state.region === 'backlund' ? backlund[id] : map[id]) || '';
 }
 function performAction(locId, actionId) {
@@ -745,13 +775,16 @@ function openRetire() {
 }
 function openFinal() {
   const candidates = endingCandidates(false);
-  const canGo = state.region === 'tingen' && state.act === 1;
-  openEndingChooser(candidates,
-    state.region === 'backlund' ? '贝克兰德结算' : '廷根结算',
-    state.region === 'backlund'
-      ? '贝克兰德的雾还在。你活过了这 14 天，现在要决定，接下来用什么身份活下去。'
-      : '你活到了第 30 天。廷根还在，你也还在。你可以留在这里结算，也可以去贝克兰德继续追因斯。',
-    canGo);
+  let next = null;
+  if (state.region === 'tingen') next = { next: 'backlund', label: '前往贝克兰德 · 第二段' };
+  else if (state.region === 'backlund') next = { next: 'sea', label: '出海 · 第三段' };
+  const titles = { tingen: '廷根结算', backlund: '贝克兰德结算', sea: '海上结算' };
+  const texts = {
+    tingen: '你活到了第 30 天。廷根还在，你也还在。你可以留在这里结算，也可以去贝克兰德继续追因斯。',
+    backlund: '贝克兰德的雾还在。你活过了这 14 天。现在，你可以留下结算，也可以登上那条没有灯的船。',
+    sea: '海风吹散了雾。你活过了这 10 天。现在，你要决定自己属于哪一片岸。'
+  };
+  openEndingChooser(candidates, titles[state.region] || '结算', texts[state.region] || '', next);
 }
 function endingCandidates(retireOnly = false) {
   const p = state.player;
@@ -765,7 +798,7 @@ function endingCandidates(retireOnly = false) {
   const pool = regionEndings();
   for (const e of pool.ordinary) {
     if (e.region && e.region !== state.region) continue;
-    if (!e.region && state.region === 'backlund') continue;
+    if (!e.region && state.region !== 'tingen') continue;
     if (ordinaryOk(e)) list.push(e);
   }
   if (!retireOnly) {
@@ -805,12 +838,13 @@ function coreOk(e) {
   }
   return true;
 }
-function openEndingChooser(candidates, title, text, canGoBacklund = false) {
+function openEndingChooser(candidates, title, text, next = null) {
   const cards = candidates.map(e => `<button class="ending-choice" data-act="pick-ending" data-id="${e.id}"><span class="ending-choice-tag">${e.headline ? '结局' : ''}</span><b>${esc(e.title)}</b><small>${esc(e.headline || '')}</small><p>${esc((e.text || '').slice(0, 80))}…</p></button>`).join('');
+  const nextBtn = next ? `<button class="btn primary small" data-act="next-act" data-next="${next.next}">${icon('arrow')}${esc(next.label)}</button>` : '';
   openModal(`<div class="modal wide">
     <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${esc(title)}</h2><p class="modal-sub">结局由你的选择、关系和${regionLabel()}的状态结算</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><p class="scene-text">${esc(text)}</p><div class="ending-grid">${cards}</div></div>
-    <div class="modal-foot">${canGoBacklund ? `<button class="btn primary small" data-act="go-backlund">${icon('arrow')}前往贝克兰德 · 第二段</button>` : ''}<span class="small" style="color:#6d5740">结局会写入存档柜；可以重开或回书架。</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再想想</button></div>
+    <div class="modal-foot">${nextBtn}<span class="small" style="color:#6d5740">结局会写入存档柜；可以重开或回书架。</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再想想</button></div>
   </div>`);
 }
 
@@ -912,7 +946,7 @@ function openCommissionBoard() {
     </div>`;
   }).join('');
   openModal(`<div class="modal wide">
-    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${regionLabel()}委托板</h2><p class="modal-sub">${state.region === 'backlund' ? '侦探所 / 码头 / 大学 / 教堂' : '黑荆棘 / 码头区 / 教会'} · 一次只能接一个</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${regionLabel()}委托板</h2><p class="modal-sub">${state.region === 'sea' ? '港口 / 船上 / 黑市' : state.region === 'backlund' ? '侦探所 / 码头 / 大学 / 教堂' : '黑荆棘 / 码头区 / 教会'} · 一次只能接一个</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><div class="commission-grid">${rows}</div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">${active ? `进行中：${esc(active.title)}` : '没有进行中的委托'}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
   </div>`);
@@ -991,24 +1025,26 @@ function chooseNight(id) {
   autoSave();
   startDay();
 }
-function startBacklund() {
-  state.region = 'backlund';
-  state.act = 2;
-  state.maxDay = 14;
+function startAct(region, act, maxDay) {
+  state.region = region;
+  state.act = act;
+  state.maxDay = maxDay;
   state.day = 1;
   state.ap = 2;
   state.activeCommission = null;
   state.pendingCanon = [];
   state.newspaper = [];
   state.ending = null;
-  const extra = (window.OC_BACKLUND && window.OC_BACKLUND.npcs) || [];
+  const extra = regionData().npcs || [];
   for (const n of extra) if (state.relations[n.id] === undefined) state.relations[n.id] = 0;
   state.screen = 'hub';
-  log('交通：蒸汽列车抵达贝克兰德。');
+  log(region === 'sea' ? '出海：罗思德群岛的潮气扑面而来。' : '交通：蒸汽列车抵达贝克兰德。');
   autoSave();
   startDay(true);
-  toast('第二段：贝克兰德。雾比廷根厚。', 'good');
+  toast(region === 'sea' ? '第三段：海上。风比雾更硬。' : '第二段：贝克兰德。雾比廷根厚。', 'good');
 }
+function startBacklund() { startAct('backlund', 2, 14); }
+function startSea() { startAct('sea', 3, 10); }
 
 /* ---------- endings ---------- */
 function showEnding(id) {
@@ -1295,9 +1331,11 @@ function endingHint(e) {
 }
 function renderEndingArchive() {
   const all = allEndings();
+  const b = (window.OC_BACKLUND && window.OC_BACKLUND.endings) || { ordinary: [], core: [] };
+  const s = (window.OC_SEA && window.OC_SEA.endings) || { ordinary: [], core: [] };
   const groups = [
-    ['普通人的结局', all.filter(e => DATA.endings.ordinary.includes(e) || (window.OC_BACKLUND && (window.OC_BACKLUND.endings.ordinary || []).includes(e)))],
-    ['核心结局', all.filter(e => DATA.endings.core.includes(e) || (window.OC_BACKLUND && (window.OC_BACKLUND.endings.core || []).includes(e)))],
+    ['普通人的结局', all.filter(e => DATA.endings.ordinary.includes(e) || (b.ordinary || []).includes(e) || (s.ordinary || []).includes(e))],
+    ['核心结局', all.filter(e => DATA.endings.core.includes(e) || (b.core || []).includes(e) || (s.core || []).includes(e))],
     ['坏结局', all.filter(e => DATA.endings.bad.includes(e))]
   ];
   const cards = groups.map(([name, list]) => `<section class="archive-section"><div class="archive-section-head"><h2>${name}</h2><span>${list.filter(e => unlockedEndings.includes(e.id)).length} / ${list.length}</span></div><div class="ending-gallery">${list.map(e => {
@@ -1334,7 +1372,7 @@ function renderCanonArchive() {
 }
 function allNpcs() {
   const seen = new Set();
-  return [].concat(DATA.npcs, (window.OC_BACKLUND && window.OC_BACKLUND.npcs) || []).filter(n => { if (!n || seen.has(n.id)) return false; seen.add(n.id); return true; });
+  return [].concat(DATA.npcs, (window.OC_BACKLUND && window.OC_BACKLUND.npcs) || [], (window.OC_SEA && window.OC_SEA.npcs) || []).filter(n => { if (!n || seen.has(n.id)) return false; seen.add(n.id); return true; });
 }
 function renderPeopleArchive() {
   const rows = allNpcs().map(n => {
@@ -1403,7 +1441,7 @@ function init() {
     getScreen: () => state.screen,
     newGame, render, startDay, openLocation, performAction, openCanon, chooseCanon,
     openCommissionBoard, acceptCommission, resolveCommission, openFinal, showEnding,
-    startBacklund, saveGame, loadSave, day: () => state.day, region: () => state.region
+    startBacklund, startSea, saveGame, loadSave, day: () => state.day, region: () => state.region
   };
 }
 document.addEventListener('click', (e) => {
@@ -1446,6 +1484,7 @@ document.addEventListener('click', (e) => {
   if (act === 'night-choice') { chooseNight(el.dataset.id); return; }
   if (act === 'pick-ending') { showEnding(el.dataset.id); return; }
   if (act === 'go-backlund') { closeModal(); startBacklund(); return; }
+  if (act === 'next-act') { closeModal(); if (el.dataset.next === 'sea') startSea(); else startBacklund(); return; }
   if (act === 'save') { openSaveDialog(); return; }
   if (act === 'save-to-slot') { saveToSlot(Number(el.dataset.slot)); return; }
   if (act === 'load-save') { loadSave(el.dataset.id); return; }
