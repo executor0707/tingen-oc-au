@@ -45,9 +45,10 @@ canon 锚点使用原创转述，不包含原作长段正文；Pages 构建与�
 node qa/verify.mjs      # 结构化 19 项
 node qa/loop.mjs        # 廷根 30 天完整循环 + 第 30 天结局
 node qa/backlund.mjs    # 廷根 → 贝克兰德转场 + 贝克兰德 14 天结局
+node qa/archive.mjs     # 结局档案 + 110 canon 总表 + 人物档案
 ```
 
-结果见 `qa/verification.json`、`qa/loop_result.json`、`qa/backlund_result.json` 与 `qa/evidence/`。
+结果见 `qa/verification.json`、`qa/loop_result.json`、`qa/backlund_result.json`、`qa/archive_result.json` 与 `qa/evidence/`。
 
 ## 边界
 
