@@ -29,6 +29,7 @@ const LOCATION_NPC = {
 };
 
 function regionData() {
+  if (state && state.region === 'forsaken' && window.OC_FORSAKEN) return window.OC_FORSAKEN;
   if (state && state.region === 'war' && window.OC_WAR) return window.OC_WAR;
   if (state && state.region === 'south' && window.OC_SOUTH) return window.OC_SOUTH;
   if (state && state.region === 'sea' && window.OC_SEA) return window.OC_SEA;
@@ -44,6 +45,7 @@ function regionAmbient() { return regionData().ambient || DATA.ambient; }
 function regionCanon() { return regionData().canon || TINGEN_CANON; }
 function regionPaper() { return regionData().paper || '廷根老实人报'; }
 function paperMast() {
+  if (state?.region === 'forsaken') return 'THE SILVER CITY TABLET';
   if (state?.region === 'war') return 'THE WARTIME GAZETTE';
   if (state?.region === 'south') return 'THE SOUTHERN COLONIAL';
   if (state?.region === 'sea') return 'THE SEA HERALD';
@@ -56,8 +58,8 @@ function regionDateLabel() { return regionData().dateLabel || (state?.region ===
 function regionEndings() {
   const base = DATA.endings;
   const out = { ordinary: base.ordinary.slice(), core: base.core.slice(), bad: base.bad.slice() };
-  for (const key of ['backlund', 'sea', 'south', 'war']) {
-    const d = window[key === 'backlund' ? 'OC_BACKLUND' : key === 'sea' ? 'OC_SEA' : key === 'south' ? 'OC_SOUTH' : 'OC_WAR'];
+  for (const key of ['backlund', 'sea', 'south', 'war', 'forsaken']) {
+    const d = window[key === 'backlund' ? 'OC_BACKLUND' : key === 'sea' ? 'OC_SEA' : key === 'south' ? 'OC_SOUTH' : key === 'war' ? 'OC_WAR' : 'OC_FORSAKEN'];
     if (d && d.endings) {
       out.ordinary.push(...(d.endings.ordinary || []));
       out.core.push(...(d.endings.core || []));
@@ -155,8 +157,9 @@ function allEndings() {
   const s = (window.OC_SEA && window.OC_SEA.endings) || { ordinary: [], core: [] };
   const t = (window.OC_SOUTH && window.OC_SOUTH.endings) || { ordinary: [], core: [] };
   const w = (window.OC_WAR && window.OC_WAR.endings) || { ordinary: [], core: [] };
+  const f = (window.OC_FORSAKEN && window.OC_FORSAKEN.endings) || { ordinary: [], core: [] };
   const seen = new Set();
-  return [].concat(DATA.endings.ordinary, b.ordinary || [], s.ordinary || [], t.ordinary || [], w.ordinary || [], DATA.endings.core, b.core || [], s.core || [], t.core || [], w.core || [], DATA.endings.bad)
+  return [].concat(DATA.endings.ordinary, b.ordinary || [], s.ordinary || [], t.ordinary || [], w.ordinary || [], f.ordinary || [], DATA.endings.core, b.core || [], s.core || [], t.core || [], w.core || [], f.core || [], DATA.endings.bad)
     .filter(e => { if (!e || seen.has(e.id)) return false; seen.add(e.id); return true; });
 }
 function updatePlaytime() {
@@ -321,7 +324,7 @@ function renderTitle() {
           <button class="btn ghost" data-act="archive">${icon('stack')}档案库</button>
           <button class="btn ghost" data-act="about">${icon('book')}廷根指南</button>
         </div>
-        <div class="oc-meta"><span>廷根 30 + 贝克兰德 14 + 海上 10 + 南大陆 8 + 战争 8 天</span><span>序列 9 起步</span><span>40 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
+        <div class="oc-meta"><span>六段 76 天 · 从廷根到神弃之地</span><span>序列 9 起步</span><span>44 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
       </div>
       <div class="oc-paper-prop paper">
         <div class="prop-head"><span>THE TINGEN HONEST MAN</span><span>1 PENNY</span></div>
@@ -444,7 +447,7 @@ function buildPlayer() {
     reputation: 0, notoriety: (flaw.mods && flaw.mods.notoriety) || 0, acting: 0
   };
   const relations = {};
-  const allNpcs = DATA.npcs.concat((window.OC_BACKLUND && window.OC_BACKLUND.npcs) || [], (window.OC_SEA && window.OC_SEA.npcs) || [], (window.OC_SOUTH && window.OC_SOUTH.npcs) || [], (window.OC_WAR && window.OC_WAR.npcs) || []);
+  const allNpcs = DATA.npcs.concat((window.OC_BACKLUND && window.OC_BACKLUND.npcs) || [], (window.OC_SEA && window.OC_SEA.npcs) || [], (window.OC_SOUTH && window.OC_SOUTH.npcs) || [], (window.OC_WAR && window.OC_WAR.npcs) || [], (window.OC_FORSAKEN && window.OC_FORSAKEN.npcs) || []);
   for (const n of allNpcs) relations[n.id] = 0;
   if (contact.mods && contact.mods.relations) for (const [k, v] of Object.entries(contact.mods.relations)) relations[k] = (relations[k] || 0) + v;
   state = freshState();
@@ -472,7 +475,9 @@ function makeNewspaper(due) {
   if (due && due.length) {
     news.push({ tag: 'CANON', text: due[0].newspaper, eventId: due[0].id });
   } else {
-    news.push({ tag: '本报', text: state.region === 'war'
+    news.push({ tag: '本报', text: state.region === 'forsaken'
+      ? '白银城昨夜灯火通明；长老会称“只是例行守夜”。'
+      : state.region === 'war'
       ? '前线昨夜“大捷”；伤亡数字不便公布。'
       : state.region === 'south'
       ? '拜朗港昨夜有送葬队伍经过；殖民当局称“地方习俗”。'
@@ -495,7 +500,9 @@ function makeNewspaper(due) {
   } else if (p.reputation >= 4) {
     news.push({ tag: '社交', text: `本城一位“热心的${p.pathwayName}”最近很活跃；有人称赞，有人警惕。` });
   } else {
-    news.push({ tag: '传闻', text: state.region === 'war'
+    news.push({ tag: '传闻', text: state.region === 'forsaken'
+      ? '荒野远征队称看见“第二个太阳”；长老会称“视觉误差”。'
+      : state.region === 'war'
       ? '前线士兵称听见祭坛方向传来歌声；军团称“风声”。'
       : state.region === 'south'
       ? '古墓群守墓人集体请假；殖民当局称“劳动力短缺”。'
@@ -621,6 +628,13 @@ function relLabel(r) {
 function locationName(id) { const l = regionLocations().find(x => x.id === id); return l ? l.name : id; }
 function canonLocationId(e) {
   const s = (e.location || '') + (e.title || '');
+  if (state.region === 'forsaken') {
+    if (s.includes('月城')) return 'moon';
+    if (s.includes('王庭')) return 'court';
+    if (s.includes('荒野')) return 'wild';
+    if (s.includes('祭坛') || s.includes('太阳')) return 'altar';
+    return 'white';
+  }
   if (state.region === 'war') {
     if (s.includes('医院')) return 'hospital';
     if (s.includes('营地') || s.includes('军团')) return 'camp';
@@ -764,6 +778,14 @@ function locationFlavor(id) {
     court: '王庭后勤处的墙上挂着地图。地图上的箭头比尸体多。',
     altar: '神降祭坛的石阶被火照得发红。士兵排着队，没有人说话。'
   };
+  const forsaken = {
+    white: '白银城的石墙很高，灯很旧。街上的人走路很轻，像怕把光震灭。',
+    moon: '月城没有月亮，只有一块块发光的碎片。使者说话时，碎片会跟着轻轻响。',
+    court: '巨人王庭的废墟比想象中安静。王座太大，坐着的人太小。',
+    wild: '黑暗荒野没有路。你走出的每一步，都会被黑暗记住。',
+    altar: '光之祭坛是全城最后一盏灯。站在这里，你能听见所有人的呼吸。'
+  };
+  if (state.region === 'forsaken') return forsaken[id] || '';
   if (state.region === 'war') return war[id] || '';
   if (state.region === 'south') return south[id] || '';
   if (state.region === 'sea') return sea[id] || '';
@@ -824,13 +846,15 @@ function openFinal() {
   else if (state.region === 'backlund') next = { next: 'sea', label: '出海 · 第三段' };
   else if (state.region === 'sea') next = { next: 'south', label: '前往南大陆 · 第四段' };
   else if (state.region === 'south') next = { next: 'war', label: '前往战争 · 第五段' };
-  const titles = { tingen: '廷根结算', backlund: '贝克兰德结算', sea: '海上结算', south: '南大陆结算', war: '战争结算' };
+  else if (state.region === 'war') next = { next: 'forsaken', label: '前往神弃之地 · 第六段' };
+  const titles = { tingen: '廷根结算', backlund: '贝克兰德结算', sea: '海上结算', south: '南大陆结算', war: '战争结算', forsaken: '神弃之地结算' };
   const texts = {
     tingen: '你活到了第 30 天。廷根还在，你也还在。你可以留在这里结算，也可以去贝克兰德继续追因斯。',
     backlund: '贝克兰德的雾还在。你活过了这 14 天。现在，你可以留下结算，也可以登上那条没有灯的船。',
     sea: '海风吹散了雾。你活过了这 10 天。现在，你可以留下结算，也可以去南大陆看看死人怎么生活。',
     south: '拜朗的太阳落下去。你活过了这 8 天。现在，你可以留下结算，也可以去前线看看活人怎么死。',
-    war: '炮声停了。你活过了这 8 天。现在，你要决定自己把名字留在哪一座纪念碑上。'
+    war: '炮声停了。你活过了这 8 天。现在，你可以留下结算，也可以去神弃之地看看没有太阳的人怎么活。',
+    forsaken: '你活过了这 6 天。白银城的灯还亮着。现在，你要决定自己要不要成为那盏灯。'
   };
   openEndingChooser(candidates, titles[state.region] || '结算', texts[state.region] || '', next);
 }
@@ -994,7 +1018,7 @@ function openCommissionBoard() {
     </div>`;
   }).join('');
   openModal(`<div class="modal wide">
-    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${regionLabel()}委托板</h2><p class="modal-sub">${state.region === 'war' ? '前线 / 军团 / 医院 / 王庭 / 祭坛' : state.region === 'south' ? '港口 / 庄园 / 祭坛 / 古墓 / 雨林' : state.region === 'sea' ? '港口 / 船上 / 黑市' : state.region === 'backlund' ? '侦探所 / 码头 / 大学 / 教堂' : '黑荆棘 / 码头区 / 教会'} · 一次只能接一个</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${regionLabel()}委托板</h2><p class="modal-sub">${state.region === 'forsaken' ? '白银城 / 月城 / 王庭 / 荒野 / 祭坛' : state.region === 'war' ? '前线 / 军团 / 医院 / 王庭 / 祭坛' : state.region === 'south' ? '港口 / 庄园 / 祭坛 / 古墓 / 雨林' : state.region === 'sea' ? '港口 / 船上 / 黑市' : state.region === 'backlund' ? '侦探所 / 码头 / 大学 / 教堂' : '黑荆棘 / 码头区 / 教会'} · 一次只能接一个</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><div class="commission-grid">${rows}</div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">${active ? `进行中：${esc(active.title)}` : '没有进行中的委托'}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
   </div>`);
@@ -1086,15 +1110,16 @@ function startAct(region, act, maxDay) {
   const extra = regionData().npcs || [];
   for (const n of extra) if (state.relations[n.id] === undefined) state.relations[n.id] = 0;
   state.screen = 'hub';
-  log(region === 'war' ? '前线：炮声从地平线传来。' : region === 'south' ? '南下：拜朗港的太阳落在码头上。' : region === 'sea' ? '出海：罗思德群岛的潮气扑面而来。' : '交通：蒸汽列车抵达贝克兰德。');
+  log(region === 'forsaken' ? '黑暗：你走进了没有太阳的地方。' : region === 'war' ? '前线：炮声从地平线传来。' : region === 'south' ? '南下：拜朗港的太阳落在码头上。' : region === 'sea' ? '出海：罗思德群岛的潮气扑面而来。' : '交通：蒸汽列车抵达贝克兰德。');
   autoSave();
   startDay(true);
-  toast(region === 'war' ? '第五段：战争。红祭司在看着你。' : region === 'south' ? '第四段：南大陆。死人比活人守规矩。' : region === 'sea' ? '第三段：海上。风比雾更硬。' : '第二段：贝克兰德。雾比廷根厚。', 'good');
+  toast(region === 'forsaken' ? '第六段：神弃之地。灯还亮着。' : region === 'war' ? '第五段：战争。红祭司在看着你。' : region === 'south' ? '第四段：南大陆。死人比活人守规矩。' : region === 'sea' ? '第三段：海上。风比雾更硬。' : '第二段：贝克兰德。雾比廷根厚。', 'good');
 }
 function startBacklund() { startAct('backlund', 2, 14); }
 function startSea() { startAct('sea', 3, 10); }
 function startSouth() { startAct('south', 4, 8); }
 function startWar() { startAct('war', 5, 8); }
+function startForsaken() { startAct('forsaken', 6, 6); }
 
 /* ---------- endings ---------- */
 function showEnding(id) {
@@ -1304,16 +1329,16 @@ function openSettings() {
       <div class="setting-row"><div><div class="s-label">字号</div><div class="s-desc">只影响文字，不改变地图布局。</div></div><div class="font-btns">${[1, 1.15, 1.3].map(v => `<button class="${settings.textScale === v ? 'on' : ''}" data-act="font-size" data-size="${v}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
       <div class="setting-row"><div><div class="s-label">减少动效</div><div class="s-desc">关闭长过渡与闪烁。</div></div><button class="switch ${settings.motion ? 'on' : ''}" data-act="toggle-motion"></button></div>
       <div class="setting-row"><div><div class="s-label">存档</div><div class="s-desc">导出 JSON，或从备份导入。</div></div><div style="display:flex;gap:5px"><button class="btn ghost small" data-act="export-saves">${icon('download')}导出</button><button class="btn ghost small" data-act="pick-import">${icon('upload')}导入</button></div></div>
-      <div class="setting-row"><div><div class="s-label">版本</div><div class="s-desc">五段 70 天 · 40 个 canon 锚点 · 本地运行</div></div><span class="tag">v0.5</span></div>
+      <div class="setting-row"><div><div class="s-label">版本</div><div class="s-desc">六段 76 天 · 44 个 canon 锚点 · 本地运行</div></div><span class="tag">v0.6</span></div>
     </div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">本作是 OC AU 同人；不含原作长段正文。</span><span class="spacer"></span><button class="btn primary small" data-act="close-modal">完成</button></div>
   </div>`, {});
 }
 function openAbout() {
   openModal(`<div class="modal">
-    <div class="modal-head"><span class="head-icon">${icon('moon')}</span><div><h2>五段旅程指南</h2><p class="modal-sub">OC AU · 70 天</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-head"><span class="head-icon">${icon('moon')}</span><div><h2>六段旅程指南</h2><p class="modal-sub">OC AU · 76 天</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body">
-      <p class="scene-text">你是一个原创非凡者。每天有 2 个行动点；读报纸，去地点，接委托，和 NPC 说话。canon 事件会在固定日期发生，你可以旁观、接触或直接介入。廷根第 30 天去贝克兰德，第 14 天出海，第 10 天南下，第 8 天去前线。</p>
+      <p class="scene-text">你是一个原创非凡者。每天有 2 个行动点；读报纸，去地点，接委托，和 NPC 说话。canon 事件会在固定日期发生，你可以旁观、接触或直接介入。廷根第 30 天去贝克兰德，第 14 天出海，第 10 天南下，第 8 天去前线，第 6 天进入神弃之地。</p>
       <div class="help-list">
         <div class="help-item"><span class="h-num">1</span><div><h4>报纸</h4><p>每天早上更新：canon 行踪、玩家影响、市井传闻。报纸可能滞后，也可能撒谎。</p></div></div>
         <div class="help-item"><span class="h-num">2</span><div><h4>判定</h4><p>属性 + d6。失败也会留下后果。占卜家/收尸人有特定判定加成。</p></div></div>
@@ -1385,9 +1410,10 @@ function renderEndingArchive() {
   const s = (window.OC_SEA && window.OC_SEA.endings) || { ordinary: [], core: [] };
   const t = (window.OC_SOUTH && window.OC_SOUTH.endings) || { ordinary: [], core: [] };
   const w = (window.OC_WAR && window.OC_WAR.endings) || { ordinary: [], core: [] };
+  const f = (window.OC_FORSAKEN && window.OC_FORSAKEN.endings) || { ordinary: [], core: [] };
   const groups = [
-    ['普通人的结局', all.filter(e => DATA.endings.ordinary.includes(e) || (b.ordinary || []).includes(e) || (s.ordinary || []).includes(e) || (t.ordinary || []).includes(e) || (w.ordinary || []).includes(e))],
-    ['核心结局', all.filter(e => DATA.endings.core.includes(e) || (b.core || []).includes(e) || (s.core || []).includes(e) || (t.core || []).includes(e) || (w.core || []).includes(e))],
+    ['普通人的结局', all.filter(e => DATA.endings.ordinary.includes(e) || (b.ordinary || []).includes(e) || (s.ordinary || []).includes(e) || (t.ordinary || []).includes(e) || (w.ordinary || []).includes(e) || (f.ordinary || []).includes(e))],
+    ['核心结局', all.filter(e => DATA.endings.core.includes(e) || (b.core || []).includes(e) || (s.core || []).includes(e) || (t.core || []).includes(e) || (w.core || []).includes(e) || (f.core || []).includes(e))],
     ['坏结局', all.filter(e => DATA.endings.bad.includes(e))]
   ];
   const cards = groups.map(([name, list]) => `<section class="archive-section"><div class="archive-section-head"><h2>${name}</h2><span>${list.filter(e => unlockedEndings.includes(e.id)).length} / ${list.length}</span></div><div class="ending-gallery">${list.map(e => {
@@ -1424,7 +1450,7 @@ function renderCanonArchive() {
 }
 function allNpcs() {
   const seen = new Set();
-  return [].concat(DATA.npcs, (window.OC_BACKLUND && window.OC_BACKLUND.npcs) || [], (window.OC_SEA && window.OC_SEA.npcs) || [], (window.OC_SOUTH && window.OC_SOUTH.npcs) || [], (window.OC_WAR && window.OC_WAR.npcs) || []).filter(n => { if (!n || seen.has(n.id)) return false; seen.add(n.id); return true; });
+  return [].concat(DATA.npcs, (window.OC_BACKLUND && window.OC_BACKLUND.npcs) || [], (window.OC_SEA && window.OC_SEA.npcs) || [], (window.OC_SOUTH && window.OC_SOUTH.npcs) || [], (window.OC_WAR && window.OC_WAR.npcs) || [], (window.OC_FORSAKEN && window.OC_FORSAKEN.npcs) || []).filter(n => { if (!n || seen.has(n.id)) return false; seen.add(n.id); return true; });
 }
 function renderPeopleArchive() {
   const rows = allNpcs().map(n => {
@@ -1493,7 +1519,7 @@ function init() {
     getScreen: () => state.screen,
     newGame, render, startDay, openLocation, performAction, openCanon, chooseCanon,
     openCommissionBoard, acceptCommission, resolveCommission, openFinal, showEnding,
-    startBacklund, startSea, startSouth, startWar, saveGame, loadSave, day: () => state.day, region: () => state.region
+    startBacklund, startSea, startSouth, startWar, startForsaken, saveGame, loadSave, day: () => state.day, region: () => state.region
   };
 }
 document.addEventListener('click', (e) => {
@@ -1536,7 +1562,7 @@ document.addEventListener('click', (e) => {
   if (act === 'night-choice') { chooseNight(el.dataset.id); return; }
   if (act === 'pick-ending') { showEnding(el.dataset.id); return; }
   if (act === 'go-backlund') { closeModal(); startBacklund(); return; }
-  if (act === 'next-act') { closeModal(); if (el.dataset.next === 'sea') startSea(); else if (el.dataset.next === 'south') startSouth(); else if (el.dataset.next === 'war') startWar(); else startBacklund(); return; }
+  if (act === 'next-act') { closeModal(); if (el.dataset.next === 'sea') startSea(); else if (el.dataset.next === 'south') startSouth(); else if (el.dataset.next === 'war') startWar(); else if (el.dataset.next === 'forsaken') startForsaken(); else startBacklund(); return; }
   if (act === 'save') { openSaveDialog(); return; }
   if (act === 'save-to-slot') { saveToSlot(Number(el.dataset.slot)); return; }
   if (act === 'load-save') { loadSave(el.dataset.id); return; }

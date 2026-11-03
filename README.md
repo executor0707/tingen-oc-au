@@ -1,6 +1,6 @@
 # 诡秘之主：廷根异闻
 
-OC AU 单机大世界沙盒的**五段垂直切片**：廷根 30 天 + 贝克兰德 14 天 + 海上 10 天 + 南大陆 8 天 + 战争 8 天。
+OC AU 单机大世界沙盒的**六段垂直切片**：廷根 30 天 + 贝克兰德 14 天 + 海上 10 天 + 南大陆 8 天 + 战争 8 天 + 神弃之地 6 天。
 
 ## 现在能玩什么
 
@@ -10,12 +10,13 @@ OC AU 单机大世界沙盒的**五段垂直切片**：廷根 30 天 + 贝克兰
 - 海上 5 个地点：罗思德港、幽蓝复仇者号、黑市、无人岛、风暴眼
 - 南大陆 5 个地点：拜朗港、殖民庄园、玫瑰祭坛、古墓群、雨林
 - 战争 5 个地点：前线战壕、军团营地、战地医院、王庭后勤处、神降祭坛
-- 每天 2 个行动点；五地 60+ 地点行动；40 个街角事件
+- 神弃之地 5 个地点：白银城、月城、巨人王庭、黑暗荒野、光之祭坛
+- 每天 2 个行动点；六地 70+ 地点行动；45 个街角事件
 - 每日报纸：canon 行踪 / 玩家影响 / 市井传闻
-- 40 个 canon 锚点（廷根 12 + 贝克兰德 12 + 海上 6 + 南大陆 5 + 战争 5）；可旁观、接触、介入
-- 32 个委托；23 个 NPC 关系
-- 廷根第 30 天去贝克兰德，第 14 天出海，第 10 天南下，第 8 天去前线
-- 结局：34 个普通人 + 11 个核心 + 3 个坏结局，按条件出现
+- 44 个 canon 锚点（廷根 12 + 贝克兰德 12 + 海上 6 + 南大陆 5 + 战争 5 + 神弃之地 4）；可旁观、接触、介入
+- 37 个委托；27 个 NPC 关系
+- 廷根第 30 天去贝克兰德，第 14 天出海，第 10 天南下，第 8 天去前线，第 6 天进入神弃之地
+- 结局：38 个普通人 + 12 个核心 + 3 个坏结局，按条件出现
 - 档案库：结局档案、110 个八部 canon 锚点、人物档案
 - 自动档 + 3 个手动档；导出/导入 JSON；移动端可用
 
@@ -52,10 +53,11 @@ node qa/backlund.mjs    # 廷根 → 贝克兰德转场 + 贝克兰德 14 天结
 node qa/sea.mjs         # 海上 10 天 + 海上结局
 node qa/south.mjs       # 南大陆 8 天 + 南大陆结局
 node qa/war.mjs         # 战争 8 天 + 战争结局
+node qa/forsaken.mjs    # 神弃之地 6 天 + 神弃之地结局
 node qa/archive.mjs     # 结局档案 + 110 canon 总表 + 人物档案
 ```
 
-结果见 `qa/verification.json`、`qa/loop_result.json`、`qa/backlund_result.json`、`qa/sea_result.json`、`qa/south_result.json`、`qa/war_result.json`、`qa/archive_result.json` 与 `qa/evidence/`。
+结果见 `qa/verification.json`、`qa/loop_result.json`、`qa/backlund_result.json`、`qa/sea_result.json`、`qa/south_result.json`、`qa/war_result.json`、`qa/forsaken_result.json`、`qa/archive_result.json` 与 `qa/evidence/`。
 
 ## 边界
 
