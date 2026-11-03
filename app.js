@@ -15,6 +15,7 @@ const DATA = window.OC_DATA;
 const TINGEN_CANON = (window.CANON_EVENTS || []).filter(e => e.volumeId === 1);
 const SAVE_KEY = 'tingen_oc_saves_v1';
 const SETTINGS_KEY = 'tingen_oc_settings_v1';
+const UNLOCK_KEY = 'tingen_oc_unlocked_endings_v1';
 
 const ATTR_LABEL = { spirit: '灵性', body: '体魄', insight: '洞察', social: '社交', luck: '运气' };
 const ATTR_ICON = { spirit: 'moon', body: 'shield', insight: 'eye', social: 'person', luck: 'spark' };
@@ -54,6 +55,8 @@ function regionEndings() {
 let state = null;
 let draft = null;
 let saves = [];
+let unlockedEndings = [];
+const ARCHIVE_TAB = { endings: '结局档案', canon: 'canon 总表', people: '人物档案' };
 let settings = { textScale: 1, motion: false };
 let modalAfter = null;
 let activeAmbient = null;
@@ -121,6 +124,23 @@ function loadSaves() {
 }
 function persistSaves() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(saves)); } catch (e) { toast('本地存储空间不足，存档未写入。', 'danger'); }
+}
+function loadUnlocked() {
+  try {
+    const a = JSON.parse(localStorage.getItem(UNLOCK_KEY) || '[]');
+    return Array.isArray(a) ? a.filter(x => typeof x === 'string') : [];
+  } catch (e) { return []; }
+}
+function unlockEnding(id) {
+  if (!id || unlockedEndings.includes(id)) return;
+  unlockedEndings.push(id);
+  try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(unlockedEndings)); } catch (e) {}
+}
+function allEndings() {
+  const b = (window.OC_BACKLUND && window.OC_BACKLUND.endings) || { ordinary: [], core: [] };
+  const seen = new Set();
+  return [].concat(DATA.endings.ordinary, b.ordinary || [], DATA.endings.core, b.core || [], DATA.endings.bad)
+    .filter(e => { if (!e || seen.has(e.id)) return false; seen.add(e.id); return true; });
 }
 function updatePlaytime() {
   const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
@@ -281,6 +301,7 @@ function renderTitle() {
           ${latest ? `<button class="btn primary" data-act="continue">${icon('play')}继续：第 ${latest.day} 天 · ${esc(latest.playerName)}</button>` : `<button class="btn primary" data-act="new">${icon('feather')}捏一个非凡者</button>`}
           <button class="btn" data-act="new">${icon('spark')}新档案</button>
           <button class="btn ghost" data-act="saves">${icon('save')}存档柜</button>
+          <button class="btn ghost" data-act="archive">${icon('stack')}档案库</button>
           <button class="btn ghost" data-act="about">${icon('book')}廷根指南</button>
         </div>
         <div class="oc-meta"><span>廷根 30 天 + 贝克兰德 14 天</span><span>序列 9 起步</span><span>24 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
@@ -538,6 +559,7 @@ function renderHub() {
         <button class="btn ghost small" data-act="open-commission">${icon('star')}委托板</button>
         <button class="btn ghost small" data-act="relations">${icon('heart')}关系档案</button>
         <button class="btn ghost small" data-act="canon-list">${icon('eye')}canon 追踪</button>
+        <button class="btn ghost small" data-act="archive">${icon('stack')}档案库</button>
         <span class="spacer"></span>
         <button class="btn ${state.ap <= 0 ? 'primary' : 'ghost'} small" data-act="end-day">${icon('moon')}结束今天</button>
       </div>
@@ -993,6 +1015,7 @@ function showEnding(id) {
   const e = endingById(id);
   if (!e) return;
   state.ending = id;
+  unlockEnding(id);
   state.screen = 'ending';
   updatePlaytime();
   autoSave();
@@ -1029,6 +1052,7 @@ function renderEnding() {
       <div class="ending-actions">
         <button class="btn primary" data-act="new">${icon('feather')}重新捏人</button>
         <button class="btn" data-act="saves">${icon('save')}存档柜</button>
+        <button class="btn ghost" data-act="archive">${icon('stack')}档案库</button>
         <button class="btn ghost" data-act="title">${icon('moon')}回到标题</button>
       </div>
       <div class="small" style="margin-top:14px;color:var(--muted);line-height:1.7">这是 OC AU 结局。原作与设定归爱潜水的乌贼及相关权利方所有。</div>
@@ -1237,6 +1261,109 @@ function openRelations() {
   </div>`);
 }
 
+/* ---------- archive ---------- */
+function archiveHeader() {
+  return `<header class="oc-hud archive-hud">
+    <button class="oc-brand" data-act="title">${icon('moon')}<span>档案库<small>THE TINGEN / BACKLUND FILES</small></span></button>
+    <div class="archive-hud-title"><b>${ARCHIVE_TAB[state.archiveTab || 'endings']}</b><span>${state.player ? `${regionLabel()} · 第 ${state.day} 天` : '未进入廷根'}</span></div>
+    <div class="hud-actions">
+      ${state.player ? `<button class="icon-btn" data-act="shelf" title="回到当前">${icon('arrow')}</button>` : ''}
+      <button class="icon-btn" data-act="title" title="回到标题">${icon('moon')}</button>
+    </div>
+  </header>`;
+}
+function renderArchive() {
+  state.screen = 'archive';
+  const tab = state.archiveTab || 'endings';
+  const counts = { endings: allEndings().filter(e => unlockedEndings.includes(e.id)).length, canon: (window.CANON_EVENTS || []).length, people: allNpcs().length };
+  const tabs = Object.keys(ARCHIVE_TAB).map(k => `<button class="archive-tab ${tab === k ? 'active' : ''}" data-act="archive-tab" data-tab="${k}">${ARCHIVE_TAB[k]}<span>${counts[k]}</span></button>`).join('');
+  const body = tab === 'canon' ? renderCanonArchive() : tab === 'people' ? renderPeopleArchive() : renderEndingArchive();
+  $('#app').innerHTML = `${archiveHeader()}<main class="archive-shell"><div class="archive-tabs">${tabs}</div>${body}</main>`;
+}
+function endingHint(e) {
+  const c = e.cond || {};
+  const bits = [];
+  if (c.humanity !== undefined) bits.push(`人性≥${c.humanity}`);
+  if (c.money !== undefined) bits.push(`金钱≥${c.money}`);
+  if (c.reputation !== undefined) bits.push(`声望≥${c.reputation}`);
+  if (c.insight !== undefined) bits.push(`洞察≥${c.insight}`);
+  if (c.acting !== undefined) bits.push(`扮演≥${c.acting}`);
+  if (c.notoriety !== undefined) bits.push(`恶名≥${c.notoriety}`);
+  if (c.flags && c.flags.length) bits.push(`关键选择：${c.flags.join('、')}`);
+  if (c.relations) bits.push(Object.entries(c.relations).map(([k, v]) => `${k}关系≥${v}`).join('、'));
+  return bits.length ? bits.join(' · ') : '完成任意一段并选择退出';
+}
+function renderEndingArchive() {
+  const all = allEndings();
+  const groups = [
+    ['普通人的结局', all.filter(e => DATA.endings.ordinary.includes(e) || (window.OC_BACKLUND && (window.OC_BACKLUND.endings.ordinary || []).includes(e)))],
+    ['核心结局', all.filter(e => DATA.endings.core.includes(e) || (window.OC_BACKLUND && (window.OC_BACKLUND.endings.core || []).includes(e)))],
+    ['坏结局', all.filter(e => DATA.endings.bad.includes(e))]
+  ];
+  const cards = groups.map(([name, list]) => `<section class="archive-section"><div class="archive-section-head"><h2>${name}</h2><span>${list.filter(e => unlockedEndings.includes(e.id)).length} / ${list.length}</span></div><div class="ending-gallery">${list.map(e => {
+    const on = unlockedEndings.includes(e.id);
+    return `<button class="ending-gallery-card ${on ? 'unlocked' : 'locked'}" data-act="archive-ending" data-id="${e.id}">
+      <span class="gallery-state">${on ? '已解锁' : '未解锁'}</span>
+      <h3>${on ? esc(e.title) : '？？？'}</h3>
+      <p>${on ? esc(e.headline || '') : esc(endingHint(e))}</p>
+      ${on ? `<small>${esc((e.text || '').slice(0, 70))}…</small>` : `<small>在${e.region === 'backlund' ? '贝克兰德' : '廷根'}或后续时间线中达成条件</small>`}
+    </button>`;
+  }).join('')}</div></section>`).join('');
+  return `<div class="archive-head"><div><p class="kicker">ENDING MATRIX</p><h1>结局档案</h1><p class="shelf-lede">已解锁 ${unlockedEndings.length} / ${all.length}。普通人结局不是失败，是另一种活法。</p></div><div class="archive-seal">${icon('star')}<b>${unlockedEndings.length}</b><span>UNLOCKED</span></div></div>${cards}`;
+}
+function renderCanonArchive() {
+  const all = window.CANON_EVENTS || [];
+  const filter = state.canonFilter || 'all';
+  const list = all.filter(e => {
+    if (filter === 'seen') return state.canonSeen.includes(e.id);
+    if (filter === 'intervened') return state.canonIntervened.includes(e.id);
+    if (filter === 'unseen') return !state.canonSeen.includes(e.id);
+    return true;
+  });
+  const vols = [1, 2, 3, 4, 5, 6, 7, 8];
+  const groups = vols.map(v => [v, list.filter(e => e.volumeId === v)]).filter(([, a]) => a.length);
+  const filters = [['all', '全部'], ['seen', '已发生'], ['unseen', '未发生'], ['intervened', '已介入']].map(([k, v]) => `<button class="archive-filter ${filter === k ? 'on' : ''}" data-act="archive-filter" data-f="${k}">${v}</button>`).join('');
+  return `<div class="archive-head"><div><p class="kicker">CANON ANCHORS</p><h1>八部 canon 总表</h1><p class="shelf-lede">${all.length} 个锚点。当前存档只记录已发生的；未发生的不会剧透细节。</p></div><div class="archive-seal">${icon('eye')}<b>${state.canonSeen.length}</b><span>SEEN</span></div></div>
+  <div class="archive-filters">${filters}</div>
+  ${groups.map(([v, arr]) => `<section class="archive-section"><div class="archive-section-head"><h2>第 ${v} 部 · ${esc(arr[0].volumeTitle)}</h2><span>${arr.length} 个锚点</span></div><div class="canon-archive">${arr.map(e => {
+    const seen = state.canonSeen.includes(e.id);
+    const inter = state.canonIntervened.includes(e.id);
+    return `<div class="canon-archive-row ${seen ? 'seen' : ''} ${inter ? 'intervened' : ''}"><span class="ca-id">${e.id}</span><div><b>${esc(e.title)}</b><small>${esc(e.location)} · ${esc(e.dateLabel)}</small></div><span class="ca-state">${inter ? '已介入' : seen ? '已发生' : '未发生'}</span></div>`;
+  }).join('')}</div></section>`).join('')}
+  ${!groups.length ? '<div class="empty-cabinet">这个筛选下没有锚点。</div>' : ''}`;
+}
+function allNpcs() {
+  const seen = new Set();
+  return [].concat(DATA.npcs, (window.OC_BACKLUND && window.OC_BACKLUND.npcs) || []).filter(n => { if (!n || seen.has(n.id)) return false; seen.add(n.id); return true; });
+}
+function renderPeopleArchive() {
+  const rows = allNpcs().map(n => {
+    const r = state.player ? (state.relations[n.id] || 0) : null;
+    return `<button class="people-card" data-act="archive-npc" data-id="${n.id}" style="--c:${n.color}"><span class="people-avatar">${esc(n.name[0])}</span><span><b>${esc(n.name)}</b><small>${esc(n.role)}</small></span><em>${r === null ? '未建档' : relLabel(r)}</em></button>`;
+  }).join('');
+  return `<div class="archive-head"><div><p class="kicker">PERSONNEL FILES</p><h1>人物档案</h1><p class="shelf-lede">廷根与贝克兰德的关系网。关系值只在当前存档内变化。</p></div><div class="archive-seal">${icon('person')}<b>${allNpcs().length}</b><span>FILES</span></div></div><div class="people-grid">${rows}</div>`;
+}
+function openEndingDetail(id) {
+  const e = allEndings().find(x => x.id === id);
+  if (!e) return;
+  if (!unlockedEndings.includes(id)) { toast('这个结局还没解锁。', ''); return; }
+  openModal(`<div class="modal narrow">
+    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${esc(e.title)}</h2><p class="modal-sub">${esc(e.headline || '')}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body"><p class="scene-text">${esc(e.text)}</p><div class="result-note">${esc(endingHint(e))}</div></div>
+    <div class="modal-foot"><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
+  </div>`);
+}
+function openArchiveNpc(id) {
+  const n = allNpcs().find(x => x.id === id);
+  if (!n) return;
+  const r = state.player ? (state.relations[id] || 0) : null;
+  openModal(`<div class="modal narrow">
+    <div class="modal-head"><span class="head-icon" style="border-color:${n.color};color:${n.color}">${icon('person')}</span><div><h2>${esc(n.name)}</h2><p class="modal-sub">${esc(n.role)}${r === null ? '' : ' · ' + relLabel(r)}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body"><p class="scene-text">${esc(n.desc)}</p></div>
+    <div class="modal-foot"><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
+  </div>`);
+}
+
 /* ---------- render / init ---------- */
 function render() {
   if (!state) state = freshState();
@@ -1245,6 +1372,7 @@ function render() {
   if (state.screen === 'hub') return renderHub();
   if (state.screen === 'ending') return renderEnding();
   if (state.screen === 'saves') return renderSaves();
+  if (state.screen === 'archive') return renderArchive();
   return renderTitle();
 }
 function newGame() {
@@ -1261,6 +1389,8 @@ function continueGame() {
 function init() {
   loadSettings();
   saves = loadSaves();
+  unlockedEndings = loadUnlocked();
+  for (const s of saves) if (s.snapshot && s.snapshot.ending) unlockEnding(s.snapshot.ending);
   state = freshState();
   draft = freshDraft();
   render();
@@ -1287,6 +1417,11 @@ document.addEventListener('click', (e) => {
   if (act === 'new') { newGame(); return; }
   if (act === 'continue') { continueGame(); return; }
   if (act === 'saves') { state.screen = 'saves'; render(); return; }
+  if (act === 'archive') { state.screen = 'archive'; state.archiveTab = state.archiveTab || 'endings'; render(); return; }
+  if (act === 'archive-tab') { state.archiveTab = el.dataset.tab; render(); return; }
+  if (act === 'archive-filter') { state.canonFilter = el.dataset.f; render(); return; }
+  if (act === 'archive-ending') { openEndingDetail(el.dataset.id); return; }
+  if (act === 'archive-npc') { openArchiveNpc(el.dataset.id); return; }
   if (act === 'about') { openAbout(); return; }
   if (act === 'settings') { openSettings(); return; }
   if (act === 'pick-origin') { draft.origin = el.dataset.id; renderCreator(); return; }
