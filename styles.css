@@ -3180,3 +3180,6 @@ body[data-theme="dark"] .loc-card { background:linear-gradient(145deg, #2a3242, 
 body[data-theme="dark"] .loc-card:hover { background:linear-gradient(145deg, #303a4c, #252e3d); }
 body[data-theme="dark"] .profile-mini, body[data-theme="dark"] .relations-panel, body[data-theme="dark"] .log-panel, body[data-theme="dark"] .canon-card, body[data-theme="dark"] .active-commission { background:#252d3c; }
 body[data-theme="dark"] .icon-btn, body[data-theme="dark"] .res { background:#252d3c; }
+.commission-lucky { margin-top:4px; font-size:9px; color:#79b4b7; border-left:2px solid rgba(121,180,183,.5); padding-left:5px; }
+.npc-dialogue.dismissed { color:#6d5740; font-style:italic; border-left-color:#8b7c63; background:rgba(139,124,99,.06); }
+body[data-theme="light"] .commission-lucky { color:#356d70; }

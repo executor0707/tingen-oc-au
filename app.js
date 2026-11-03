@@ -102,14 +102,14 @@ const LONG_COMMISSIONS = {
 for (const list of Object.values(LONG_COMMISSIONS)) for (const c of list) c.longTerm = true;
 const NPC_VOICE = {
   dunn: {
-    cold: ['“有事就说。黑荆棘的门不锁。”', '“今天的咖啡不错。虽然我忘了是谁煮的。”'],
-    warm: ['“你最近来得勤。别把值夜者当成避难所。”', '“我记性不好，但我记得你帮过忙。”'],
+    cold: ['“有事就说。黑荆棘不养闲人。”', '“廷根最近不太平。夜里少出门。”'],
+    warm: ['“你来得正好。有些事，我想听听你的判断。”', '“别总一个人扛。值夜者也不是铁打的。”'],
     close: ['“如果哪天我忘了自己是谁，你提醒我一句。”', '“别学我。把重要的人放在看得见的地方。”']
   },
   klein: {
-    cold: ['“你找我？如果是占卜，收费的。”', '“廷根的雾最近很重。少走夜路。”'],
-    warm: ['“你上次说的那件事，我查了一点。”', '“有些答案不知道，反而能睡得着。”'],
-    close: ['“你从廷根走到这里，已经不再是一个人了。”', '“如果我不在，替我把门关上。”']
+    cold: ['“你找我？先说好，我只帮得上一点忙。”', '“最近雾大。别走太偏的路。”'],
+    warm: ['“你上次提的那件事，我记着。只是还没想明白。”', '“有些答案，知道得越少越安全。”'],
+    close: ['“如果我哪天不在了，别替我找答案。”', '“你能走到这里，已经比我预想的有勇气。”']
   },
   leonard: {
     cold: ['“诗人也要吃饭。有事快说。”', '“你看起来像一首还没押韵的诗。”'],
@@ -119,7 +119,7 @@ const NPC_VOICE = {
   melissa: {
     cold: ['“你找我？怀表又坏了？”', '“哥哥最近很忙。你也一样。”'],
     warm: ['“我留了面包在门口。别又忘了吃。”', '“你看起来像三天没睡。”'],
-    close: ['“不管你在外面是谁，回来就是哥哥。”', '“别把自己弄丢了。”']
+    close: ['“不管你在外面是谁，回来就好。”', '“别把自己弄丢了。”']
   },
   audrey: {
     cold: ['“你好。我们见过吗？”', '“霍尔家不随便接待陌生人。”'],
@@ -155,7 +155,14 @@ function seasonLabel() {
 function npcTalkLine(n) {
   const r = state.relations[n.id] || 0;
   const tier = r >= 5 ? 'close' : r >= 3 ? 'warm' : r >= 1 ? 'warm' : 'cold';
+  if (!state.npcTalkDay || state.npcTalkDay.day !== state.day) state.npcTalkDay = { day: state.day, counts: {} };
+  const dailyCount = (state.npcTalkDay.counts[n.id] || 0) + 1;
+  state.npcTalkDay.counts[n.id] = dailyCount;
+  const limit = 2 + Math.floor(Math.max(0, r) / 2);
   const idx = state.npcTalk[n.id] || 0;
+  if (dailyCount > limit) {
+    return { dismissed: true, text: '', time: timeLabel(), season: seasonLabel(), count: dailyCount, tier };
+  }
   state.npcTalk[n.id] = idx + 1;
   const voice = NPC_VOICE[n.id];
   const lines = voice ? (voice[tier] || voice.cold) : [
@@ -258,6 +265,7 @@ function freshState() {
     playtime: 0,
     settings: { textScale: 1.25, motion: false, theme: 'dark' },
     npcTalk: {},
+    npcTalkDay: { day: 1, counts: {} },
     identityClues: [],
     identitySeen: [],
     pendingIdentity: null,
@@ -360,6 +368,7 @@ function snapshot() {
     player: JSON.parse(JSON.stringify(state.player)),
     relations: JSON.parse(JSON.stringify(state.relations)),
     npcTalk: JSON.parse(JSON.stringify(state.npcTalk || {})),
+    npcTalkDay: JSON.parse(JSON.stringify(state.npcTalkDay || { day: state.day, counts: {} })),
     identityClues: (state.identityClues || []).slice(),
     identitySeen: (state.identitySeen || []).slice(),
     flags: JSON.parse(JSON.stringify(state.flags)),
@@ -662,6 +671,7 @@ function startDay(first = false) {
   state.ap = DAILY_AP;
   state.morningAp = 2;
   state.afternoonAp = 3;
+  if (!state.npcTalkDay || state.npcTalkDay.day !== state.day) state.npcTalkDay = { day: state.day, counts: {} };
   state.ending = null;
   state.maxDay = regionData().maxDay || state.maxDay || 120;
   const due = regionCanon().filter(e => e.dayStart === state.day);
@@ -1451,6 +1461,7 @@ function openCommissionBoard() {
       <div class="commission-meta"><span>${attrName(c.check.attr)} DC ${c.check.dc}</span><span>成功率 ${chanceFor(c.check.attr, c.check.dc, `commission:${c.id}${isLong ? ':long' : ''}`)}%</span><span>${isLong ? '跳过 ' : ''}${c.days} 天</span><span>${c.reward} 镑</span></div>
       ${c.effects ? `<div class="commission-gain">${effectTags(c.effects)}</div>` : ''}
       ${c.material ? `<div class="commission-material">材料：${esc(c.material)}</div>` : ''}
+      ${isLong ? `<div class="commission-lucky">意外之喜：0–${c.days * 3} 镑 · 0–${c.days} 属性点（逐日概率）</div>` : ''}
       ${done ? '<span class="commission-done">已完成</span>' : isActive ? '<span class="commission-done">进行中</span>' : `<button class="btn small" data-act="accept-commission" data-id="${c.id}" ${active && !isLong ? 'disabled' : ''}>${isLong ? `接取并跳过 ${c.days} 天` : '接受'}</button>`}
     </div>`;
   }).join('');
@@ -1460,14 +1471,33 @@ function openCommissionBoard() {
     <div class="modal-foot"><span class="small" style="color:#6d5740">${active ? `进行中：${esc(active.title)}` : '没有进行中的委托'}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
   </div>`);
 }
+function longUnexpected(days, seed) {
+  const rng = seeded(`lucky:${seed}:${state.day}:${days}`);
+  const money = { value: 0 };
+  const effects = { money: 0, insight: 0, body: 0, spirit: 0, social: 0, luck: 0 };
+  const attrKeys = ['insight', 'body', 'spirit', 'social', 'luck'];
+  for (let d = 0; d < days; d++) {
+    if (rng() < 0.45) money.value += 1 + Math.floor(rng() * 3);
+    if (rng() < 0.32) effects[attrKeys[Math.floor(rng() * attrKeys.length)]] += 1;
+  }
+  effects.money = money.value;
+  const bits = [];
+  if (effects.money) bits.push(`${effects.money} 镑`);
+  const attrBits = attrKeys.filter(k => effects[k]).map(k => `${attrName(k)} +${effects[k]}`);
+  if (attrBits.length) bits.push(attrBits.join(' · '));
+  return { effects, text: bits.length ? `途中还有意外之喜：${bits.join('，')}。` : '' };
+}
 function runLongCommission(c) {
   if (!c || !c.longTerm) return;
+  const fromDay = state.day;
   const check = roll(c.check.attr, c.check.dc, `commission:${c.id}:long`);
-  const target = Math.min(state.maxDay, state.day + c.days);
-  const skipped = regionCanon().filter(e => e.dayStart > state.day && e.dayStart <= target);
+  const target = Math.min(state.maxDay, fromDay + c.days);
+  const skippedDays = target - fromDay;
+  const skipped = regionCanon().filter(e => e.dayStart > fromDay && e.dayStart <= target);
   for (const e of skipped) if (!state.canonSeen.includes(e.id)) state.canonSeen.push(e.id);
+  const lucky = longUnexpected(skippedDays, c.id);
   const rewardEffects = check.success
-    ? Object.assign({}, c.effects || {}, { money: c.reward })
+    ? Object.assign({}, c.effects || {}, lucky.effects, { money: ((c.effects && c.effects.money) || 0) + c.reward + lucky.effects.money })
     : { notoriety: 1, health: -1 };
   applyEffects(rewardEffects);
   if (check.success) {
@@ -1476,7 +1506,7 @@ function runLongCommission(c) {
       if (!state.player.materials.includes(c.material)) state.player.materials.push(c.material);
     }
     if (!state.completedCommissions.includes(c.id)) state.completedCommissions.push(c.id);
-    log(`完成长期委托：${c.title}（跳过 ${c.days} 天）`);
+    log(`完成长期委托：${c.title}（跳过 ${skippedDays} 天）`);
   } else {
     log(`长期委托失败：${c.title}`);
   }
@@ -1486,10 +1516,11 @@ function runLongCommission(c) {
   state.pendingCanon = [];
   startDay();
   autoSave();
+  toast(`时间跳过 ${skippedDays} 天：第 ${fromDay} 天 → 第 ${target} 天。`, 'good');
   if (checkFailure()) return;
   const text = check.success
-    ? `你接下了「${c.title}」。${c.days} 天后，你带着报酬回来。时间被直接翻过去了，没有留下行动的余地。`
-    : `你接下了「${c.title}」。${c.days} 天后，事情没有办成。你带着伤和一点坏名声回来。`;
+    ? `第 ${fromDay} 天接取「${c.title}」。${skippedDays} 天后，你带着报酬回来（第 ${target} 天）。${lucky.text}时间被直接翻过去了，没有留下行动的余地。`
+    : `第 ${fromDay} 天接取「${c.title}」。${skippedDays} 天后，事情没有办成（第 ${target} 天）。你带着伤和一点坏名声回来。`;
   showActionResult(c.title, text, rewardEffects, check, () => {
     if (state.day >= state.maxDay) openFinal(); else renderHub();
   });
@@ -1758,6 +1789,7 @@ async function loadSave(id) {
   state = Object.assign(freshState(), JSON.parse(JSON.stringify(s.snapshot)));
   state.maxDay = state.maxDay || regionData().maxDay || 120;
   state.npcTalk = state.npcTalk || {};
+  state.npcTalkDay = state.npcTalkDay || { day: state.day, counts: {} };
   state.identityClues = state.identityClues || [];
   state.identitySeen = state.identitySeen || [];
   state.pendingIdentity = null;
@@ -1919,9 +1951,17 @@ function openNpc(id) {
   state.npcTalk = state.npcTalk || {};
   const r = state.relations[id] || 0;
   const talk = npcTalkLine(n);
+  if (talk.dismissed) {
+    openModal(`<div class="modal narrow npc-modal">
+      <div class="modal-head"><span class="head-icon" style="border-color:${n.color};color:${n.color}">${icon('person')}</span><div><h2>${esc(n.name)}</h2><p class="modal-sub">${esc(n.role)} · ${relLabel(r)} · ${talk.season} ${talk.time}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+      <div class="modal-body"><p class="scene-text">${esc(n.desc)}</p><div class="npc-dialogue dismissed" style="--c:${n.color}">${r >= 3 ? '“今天已经聊得够久了。剩下的，下次再说吧。”' : '“我今天不想再谈。你请回吧。”'}</div><div class="npc-talk-meta">今天第 ${talk.count} 次来找 · 对方暂时不想继续</div></div>
+      <div class="modal-foot"><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">离开</button></div>
+    </div>`);
+    return;
+  }
   openModal(`<div class="modal narrow npc-modal">
     <div class="modal-head"><span class="head-icon" style="border-color:${n.color};color:${n.color}">${icon('person')}</span><div><h2>${esc(n.name)}</h2><p class="modal-sub">${esc(n.role)} · ${relLabel(r)} · ${talk.season} ${talk.time}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
-    <div class="modal-body"><p class="scene-text">${esc(n.desc)}</p><div class="npc-dialogue" style="--c:${n.color}">“${esc(talk.text)}”</div><div class="npc-talk-meta">第 ${talk.count} 次交谈 · 关系 ${r} · ${talk.season}的${talk.time}</div><div class="relation-meter"><i style="width:${Math.min(100, (r + 5) * 10)}%"></i></div><p class="small muted">关系：${r} · 在对应地点行动可以提升。</p></div>
+    <div class="modal-body"><p class="scene-text">${esc(n.desc)}</p><div class="npc-dialogue" style="--c:${n.color}">${esc(talk.text)}</div><div class="npc-talk-meta">第 ${talk.count} 次交谈 · 关系 ${r} · ${talk.season}的${talk.time}</div><div class="relation-meter"><i style="width:${Math.min(100, (r + 5) * 10)}%"></i></div><p class="small muted">关系：${r} · 在对应地点行动可以提升。</p></div>
     <div class="modal-foot"><button class="btn ghost small" data-act="npc" data-id="${id}">${icon('feather')}再聊一句</button><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
   </div>`);
 }
