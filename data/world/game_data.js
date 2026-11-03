@@ -42,6 +42,7 @@ window.OC_DATA = {
     { id: 'church', name: '圣赛琳娜教堂', sub: '红月亮街与查尼斯门', icon: 'church', color: '#6a536f' }
   ],
   npcs: [
+    { id: 'klein', name: '克莱恩·莫雷蒂', role: '值夜者 / 占卜家', color: '#c9a35c', desc: '一个看起来有些疲惫的年轻人。你总觉得他看人的方式不像一个普通的占卜家。' },
     { id: 'dunn', name: '邓恩·史密斯', role: '值夜者队长', color: '#8c9894', desc: '温和、健忘、可靠。你总觉得他身上有一层很薄的疲惫。' },
     { id: 'leonard', name: '伦纳德·米切尔', role: '午夜诗人', color: '#709b7a', desc: '诗人、值夜者、嘴贫。他看你的眼神像在写一首还没押韵的诗。' },
     { id: 'melissa', name: '梅丽莎·莫雷蒂', role: '技术学校学生', color: '#c6a78d', desc: '克莱恩的妹妹。她不知道你是谁，但知道你最近总在夜里出门。' },
@@ -58,6 +59,7 @@ window.OC_DATA = {
     ],
     blackthorn: [
       { id: 'dunn', label: '找邓恩聊聊', desc: '值夜者队长愿意听你说十分钟。', effects: { relations: { dunn: 1 }, humanity: 1 }, text: '邓恩给你倒了杯咖啡，然后忘了自己已经倒过一杯。' },
+      { id: 'klein', label: '和克莱恩说几句话', desc: '那个年轻人总坐在窗边，像在等一封不会来的信。', effects: { relations: { klein: 1 }, insight: 1, flags: { saw_klein: true } }, text: '克莱恩抬头看了你一眼。他说：“你最近最好别在晚上出门。”你问为什么，他只是笑了一下。' },
       { id: 'archive', label: '查内部档案', desc: '关于 2-049、兰尔乌斯、红烟囱。', check: { attr: 'insight', dc: 9 }, effects: { insight: 1, reputation: 1 }, fail: { madness: 1 }, text: '你在档案室待到眼睛发酸。纸页上有一些被剪掉的名字。' },
       { id: 'lev', label: '找伦纳德', desc: '诗人今天值班，心情不错。', effects: { relations: { leonard: 1 }, insight: 1 }, text: '伦纳德把脚翘在桌上，给你念了一首关于雾的诗。你假装没听懂。' },
       { id: 'board', label: '查看委托板', desc: '教会、私家、地下市场的委托。', effects: {}, openBoard: true, text: '委托板上钉着几张纸，有一张的边角被血粘住了。' }

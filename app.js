@@ -20,7 +20,7 @@ const ATTR_LABEL = { spirit: '灵性', body: '体魄', insight: '洞察', social
 const ATTR_ICON = { spirit: 'moon', body: 'shield', insight: 'eye', social: 'person', luck: 'spark' };
 const LOCATION_NPC = {
   home: ['melissa'],
-  blackthorn: ['dunn', 'leonard', 'rosa'],
+  blackthorn: ['dunn', 'klein', 'leonard', 'rosa'],
   club: ['christina'],
   asylum: ['frye'],
   docks: [],
