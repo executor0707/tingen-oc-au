@@ -18,6 +18,19 @@ const SETTINGS_KEY = 'tingen_oc_settings_v1';
 const UNLOCK_KEY = 'tingen_oc_unlocked_endings_v1';
 
 const DAILY_AP = 5;
+const SEQUENCE_NAMES = { 9: '占卜家', 8: '小丑', 7: '魔术师', 6: '无面人', 5: '秘偶大师', 4: '诡法师', 3: '古代学者', 2: '奇迹师', 1: '诡秘侍者', 0: '愚者' };
+const SEQUENCE_TASKS = {
+  9: { to: 8, potion: '小丑魔药', material: '占卜家魔药·主材料', cost: 30, dc: 9, acting: 3 },
+  8: { to: 7, potion: '魔术师魔药', material: '小丑魔药·主材料', cost: 45, dc: 10, acting: 3 },
+  7: { to: 6, potion: '无面人魔药', material: '魔术师魔药·主材料', cost: 60, dc: 11, acting: 4 },
+  6: { to: 5, potion: '秘偶大师魔药', material: '无面人魔药·主材料', cost: 80, dc: 12, acting: 4 },
+  5: { to: 4, potion: '诡法师魔药', material: '秘偶大师魔药·主材料', cost: 100, dc: 13, acting: 5 },
+  4: { to: 3, potion: '古代学者魔药', material: '诡法师魔药·主材料', cost: 125, dc: 14, acting: 5 },
+  3: { to: 2, potion: '奇迹师魔药', material: '古代学者魔药·主材料', cost: 150, dc: 15, acting: 6 },
+  2: { to: 1, potion: '诡秘侍者魔药', material: '奇迹师魔药·主材料', cost: 180, dc: 16, acting: 6 },
+  1: { to: 0, potion: '愚者魔药', material: '诡秘侍者魔药·主材料', cost: 220, dc: 18, acting: 8 }
+};
+function sequenceName(n) { return SEQUENCE_NAMES[n] || '未知'; }
 const ATTR_LABEL = { spirit: '灵性', body: '体魄', insight: '洞察', social: '社交', luck: '运气' };
 const ATTR_ICON = { spirit: 'moon', body: 'shield', insight: 'eye', social: 'person', luck: 'spark' };
 const LOCATION_NPC = {
@@ -38,6 +51,121 @@ const MINOR_POOL = {
   apocalypse: ['adam'],
   fool: ['leonard']
 };
+const IDENTITY_CLUES = [
+  { id: 'id-tingen-clerk', region: 'tingen', minDay: 5, title: '钟表店里的旧名字', text: '你在旧钟表店的账本背面看到两个名字：克莱恩·莫雷蒂，以及一行被墨水涂掉的“周明瑞”。笔迹和你在报纸上见过的某个署名很像。', clue: '克莱恩·莫雷蒂 / 周明瑞' },
+  { id: 'id-backlund-detective', region: 'backlund', minDay: 18, title: '夏洛克·莫里亚蒂', text: '雾霾里的侦探事务所挂着“夏洛克·莫里亚蒂”的牌子。你看见他抬手压了压礼帽，动作和廷根那个值夜者一模一样。', clue: '夏洛克·莫里亚蒂' },
+  { id: 'id-sea-admiral', region: 'sea', minDay: 30, title: '格尔曼·斯帕罗', text: '港口的通缉令上画着一张冷硬的脸。你认得那双眼睛——他曾经用另一张脸在廷根的黑荆棘喝过咖啡。', clue: '格尔曼·斯帕罗' },
+  { id: 'id-backlund-magnate', region: 'backlund', minDay: 70, title: '道恩·唐泰斯', text: '慈善晚宴的宾客名单上，“道恩·唐泰斯”被安排在靠窗的位置。他举杯的姿势让你想起一个已经死过很多次的人。', clue: '道恩·唐泰斯' },
+  { id: 'id-fool-merlin', region: 'fool', minDay: 8, title: '梅林·赫尔墨斯', text: '灰雾里有人念出“梅林·赫尔墨斯”这个名字。你突然意识到，那些身份从来不是伪装，而是同一个人在不同时间里留下的锚点。', clue: '梅林·赫尔墨斯' }
+];
+const SCATTERED_ENDINGS = [
+  { id: 'scatter_storyteller', title: '港口说书人', headline: '《港口说书人专讲“愚者”的故事，听众半信半疑》', cond: { insight: 5 }, region: 'any', text: '你在港口摆了一张桌子，专门讲“愚者”的故事。有人给钱，有人骂你胡说。你从不讲结局，只讲那些名字。' },
+  { id: 'scatter_collector', title: '旧物收藏家', headline: '《旧物收藏家买下一批“没有来历”的银器》', cond: { money: 15 }, region: 'any', text: '你开始收藏旧物：一枚没有正面的硬币、一张被烧掉一半的塔罗牌、一块会变冷的石头。你把它们放在同一个柜子里，从不解释。' },
+  { id: 'scatter_hermit', title: '乡下隐士', headline: '《乡下隐士拒绝接受采访，称“种地比拯救世界重要”》', cond: { humanity: 5 }, region: 'any', text: '你在乡下租了一块地，种土豆和向日葵。邻居说你是个怪人，但每年冬天，你都会给路过的人留一碗热汤。' },
+  { id: 'scatter_neighbor', title: '街区好人', headline: '《街区好人候选名单：那个总在半夜帮人修灯的怪人》', cond: { reputation: 4 }, region: 'any', text: '你成了一条街上“有事可以找他”的人。修灯、找猫、搬家具、听人抱怨。你不再碰封印物，但也不怕黑夜。' },
+  { id: 'scatter_blank_card', title: '空白卡牌', headline: '《塔罗会档案缺失一页：一张没有名字的牌》', cond: { flags: ['blankCard'] }, region: 'any', text: '你把自己写进了一张原本不存在的牌。灰雾承认了你，但历史里没有你的位置。你成为塔罗会档案里那页空白。' }
+];
+const LONG_COMMISSIONS = {
+  tingen: [
+    { id: 'long-t-7', title: '廷根旧案整理', location: 'blackthorn', days: 7, check: { attr: 'insight', dc: 11 }, reward: 24, effects: { insight: 2, reputation: 2 }, material: '占卜家魔药·主材料', desc: '黑荆棘的旧档案堆了七年。邓恩说，整理完可以借你一份“占卜家”配方。' },
+    { id: 'long-t-15', title: '护送商队去贝克兰德', location: 'docks', days: 15, check: { attr: 'body', dc: 10 }, reward: 45, effects: { body: 2, money: 45, reputation: 1 }, material: '旅行者护符', desc: '一支商队需要人护送十五天。报酬很高，路很长。' }
+  ],
+  backlund: [
+    { id: 'long-b-7', title: '雾霾中的长期调查', location: 'detective', days: 7, check: { attr: 'insight', dc: 12 }, reward: 28, effects: { insight: 2, reputation: 2 }, material: '无面人魔药·辅助材料', desc: '一桩连续七天的失踪案。每天都有新的名字，每天都没有尸体。' },
+    { id: 'long-b-15', title: '皇后区私人安保', location: 'west', days: 15, check: { attr: 'social', dc: 10 }, reward: 55, effects: { social: 2, money: 55, reputation: 2 }, material: '贵族沙龙邀请函', desc: '一位夫人需要十五天的“体面保护”。她知道你是谁，也知道你不该问。' }
+  ],
+  sea: [
+    { id: 'long-s-7', title: '风暴眼测绘', location: 'ship', days: 7, check: { attr: 'insight', dc: 12 }, reward: 32, effects: { insight: 2, reputation: 2 }, material: '风暴之眼海水', desc: '阿尔杰要一张能穿过风暴眼的海图。七天，少一天都不行。' },
+    { id: 'long-s-15', title: '远洋护航', location: 'port', days: 15, check: { attr: 'body', dc: 11 }, reward: 60, effects: { body: 2, money: 60, reputation: 2 }, material: '海盗王的旧罗盘', desc: '十五天的远洋航线。船主说，回来就给你一件“海上用过的东西”。' }
+  ],
+  south: [
+    { id: 'long-so-7', title: '古墓群清理', location: 'grave', days: 7, check: { attr: 'spirit', dc: 11 }, reward: 30, effects: { spirit: 2, insight: 1 }, material: '不死者魔药·主材料', desc: '古墓群最近不安分。守墓人需要一个不怕死的人，待七个晚上。' },
+    { id: 'long-so-15', title: '雨林远征', location: 'jungle', days: 15, check: { attr: 'body', dc: 11 }, reward: 58, effects: { body: 2, money: 58, reputation: 2 }, material: '玫瑰学派的封印匣', desc: '十五天的雨林远征。回来的人说，那里有一扇不该开的门。' }
+  ],
+  war: [
+    { id: 'long-w-7', title: '战地医院夜班', location: 'hospital', days: 7, check: { attr: 'body', dc: 10 }, reward: 30, effects: { body: 2, humanity: 2 }, material: '红祭司的灰烬', desc: '连续七个夜晚的战地医院。医生需要一双手，不管它会不会发抖。' },
+    { id: 'long-w-15', title: '前线补给线', location: 'court', days: 15, check: { attr: 'social', dc: 11 }, reward: 55, effects: { social: 2, reputation: 2, money: 55 }, material: '军团通行证', desc: '十五天的补给线押运。王庭说“很安全”，前线说“别信”。' }
+  ],
+  forsaken: [
+    { id: 'long-f-7', title: '白银城守灯', location: 'white', days: 7, check: { attr: 'spirit', dc: 11 }, reward: 32, effects: { spirit: 2, humanity: 2 }, material: '逐光者魔药·灯芯', desc: '七个夜晚，守住白银城最后一盏灯。灯灭之前，不能睡。' },
+    { id: 'long-f-15', title: '黑暗荒野远征', location: 'wild', days: 15, check: { attr: 'body', dc: 12 }, reward: 60, effects: { body: 2, insight: 2 }, material: '巨人的旧王冠碎片', desc: '十五天的荒野远征。科林说，回来的人可以带走一件王庭遗物。' }
+  ],
+  apocalypse: [
+    { id: 'long-a-7', title: '废墟救援周', location: 'ruins', days: 7, check: { attr: 'body', dc: 10 }, reward: 30, effects: { body: 1, humanity: 3 }, material: '末日灰烬', desc: '七天，在贝克兰德废墟里找人。能找到多少，算多少。' },
+    { id: 'long-a-15', title: '星界观测', location: 'star', days: 15, check: { attr: 'insight', dc: 12 }, reward: 55, effects: { insight: 3, madness: 1 }, material: '门先生的碎片', desc: '十五天的星界观测。记录裂缝，记录门，记录门后的东西。' }
+  ],
+  fool: [
+    { id: 'long-z-7', title: '塔罗会最后一次聚会', location: 'table', days: 7, check: { attr: 'social', dc: 10 }, reward: 30, effects: { social: 2, humanity: 2 }, material: '愚者的旧塔罗牌', desc: '七天的准备，只为一场聚会。奥黛丽说，下一次不一定还有人。' },
+    { id: 'long-z-15', title: '灰雾巡游', location: 'fog', days: 15, check: { attr: 'spirit', dc: 12 }, reward: 60, effects: { spirit: 2, insight: 2 }, material: '灰雾结晶', desc: '十五天，在灰雾里找一张空椅子。没有人知道它属于谁。' }
+  ]
+};
+const NPC_VOICE = {
+  dunn: {
+    cold: ['“有事就说。黑荆棘的门不锁。”', '“今天的咖啡不错。虽然我忘了是谁煮的。”'],
+    warm: ['“你最近来得勤。别把值夜者当成避难所。”', '“我记性不好，但我记得你帮过忙。”'],
+    close: ['“如果哪天我忘了自己是谁，你提醒我一句。”', '“别学我。把重要的人放在看得见的地方。”']
+  },
+  klein: {
+    cold: ['“你找我？如果是占卜，收费的。”', '“廷根的雾最近很重。少走夜路。”'],
+    warm: ['“你上次说的那件事，我查了一点。”', '“有些答案不知道，反而能睡得着。”'],
+    close: ['“你从廷根走到这里，已经不再是一个人了。”', '“如果我不在，替我把门关上。”']
+  },
+  leonard: {
+    cold: ['“诗人也要吃饭。有事快说。”', '“你看起来像一首还没押韵的诗。”'],
+    warm: ['“我写了一首新的。你要听吗？算了，你还是别听。”', '“黑荆棘的屋顶很适合看月亮。”'],
+    close: ['“最后一首还没写完。你替我记着。”', '“别死。死了就没人听我念诗了。”']
+  },
+  melissa: {
+    cold: ['“你找我？怀表又坏了？”', '“哥哥最近很忙。你也一样。”'],
+    warm: ['“我留了面包在门口。别又忘了吃。”', '“你看起来像三天没睡。”'],
+    close: ['“不管你在外面是谁，回来就是哥哥。”', '“别把自己弄丢了。”']
+  },
+  audrey: {
+    cold: ['“你好。我们见过吗？”', '“霍尔家不随便接待陌生人。”'],
+    warm: ['“你上次说的非凡世界，我又想了很多。”', '“你觉得，救人需要先救自己吗？”'],
+    close: ['“塔罗会还在。我会等下一次聚会。”', '“你不需要一个人承担所有事。”']
+  },
+  alger: {
+    cold: ['“船上不讲闲话。有事说事。”', '“风暴不会因为你是好人就绕开。”'],
+    warm: ['“你比大多数水手可靠。”', '“有些航线，走一次就够了。”'],
+    close: ['“如果我没回来，塔罗会还在。”', '“别信海。信人。”']
+  },
+  azik: {
+    cold: ['“历史不会回答所有问题。”', '“你身上有股很旧的味道。”'],
+    warm: ['“这里的死者不怕被遗忘，怕被叫错名字。”', '“你最近总在查同一扇门。”'],
+    close: ['“我记不清很多事。但我记得你。”', '“死亡不是终点，遗忘才是。”']
+  },
+  derek: {
+    cold: ['“外乡人，你见过太阳吗？”', '“白银城的灯还够用。”'],
+    warm: ['“外面的太阳，真的会照到每个人吗？”', '“我今天多领了一份灯油。”'],
+    close: ['“如果我点不亮，你替我点。”', '“你是我的朋友。城里的朋友。”']
+  }
+};
+function timeLabel() {
+  if ((state.morningAp || 0) > 0) return '上午';
+  if ((state.afternoonAp || 0) > 0) return '下午';
+  return '傍晚';
+}
+function seasonLabel() {
+  const spans = ['初春', '暮春', '盛夏', '初秋', '深秋', '初冬'];
+  const idx = Math.min(spans.length - 1, Math.floor((state.day - 1) / Math.max(1, state.maxDay) * spans.length));
+  return spans[idx];
+}
+function npcTalkLine(n) {
+  const r = state.relations[n.id] || 0;
+  const tier = r >= 5 ? 'close' : r >= 3 ? 'warm' : r >= 1 ? 'warm' : 'cold';
+  const idx = state.npcTalk[n.id] || 0;
+  state.npcTalk[n.id] = idx + 1;
+  const voice = NPC_VOICE[n.id];
+  const lines = voice ? (voice[tier] || voice.cold) : [
+    `“${timeLabel()}好。${seasonLabel()}的风从${regionLabel()}另一边吹过来。”`,
+    `“你最近来得比平时勤。是有什么事，还是只是想找个人说话？”`,
+    `“${n.role}这行，见的人多了，就不太记得脸。但你我还记得。”`
+  ];
+  let base = lines[idx % lines.length];
+  if (idx >= lines.length) base = `“${n.name}看了你一眼，${seasonLabel()}的${timeLabel()}光落在桌上：‘这是你今天第 ${idx + 1} 次来找我了。’”`;
+  return { text: base, time: timeLabel(), season: seasonLabel(), count: idx + 1, tier };
+}
 
 function regionData() {
   if (state && state.region === 'fool' && window.OC_FOOL) return window.OC_FOOL;
@@ -53,7 +181,10 @@ function regionLocations() { return regionData().locations || DATA.locations; }
 function regionNPCs() { return regionData().npcs || DATA.npcs; }
 function regionNpcLocations() { return regionData().npcLocations || LOCATION_NPC; }
 function regionActions() { return regionData().actions || DATA.actions; }
-function regionCommissions() { return regionData().commissions || DATA.commissions; }
+function regionCommissions() {
+  const base = regionData().commissions || DATA.commissions;
+  return base.concat(LONG_COMMISSIONS[state?.region || 'tingen'] || []);
+}
 function regionAmbient() { return regionData().ambient || DATA.ambient; }
 function regionCanon() {
   const base = regionData().canon || TINGEN_CANON;
@@ -80,7 +211,7 @@ function regionLabel() { return regionData().name || '廷根'; }
 function regionDateLabel() { return regionData().dateLabel || (state?.region === 'backlund' ? '1349 年 9 月' : '1349 年 7 月'); }
 function regionEndings() {
   const base = DATA.endings;
-  const out = { ordinary: base.ordinary.slice(), core: base.core.slice(), bad: base.bad.slice() };
+  const out = { ordinary: base.ordinary.concat(SCATTERED_ENDINGS), core: base.core.slice(), bad: base.bad.slice() };
   for (const key of ['backlund', 'sea', 'south', 'war', 'forsaken', 'apocalypse', 'fool']) {
     const d = window[key === 'backlund' ? 'OC_BACKLUND' : key === 'sea' ? 'OC_SEA' : key === 'south' ? 'OC_SOUTH' : key === 'war' ? 'OC_WAR' : key === 'forsaken' ? 'OC_FORSAKEN' : key === 'apocalypse' ? 'OC_APOCALYPSE' : 'OC_FOOL'];
     if (d && d.endings) {
@@ -96,7 +227,7 @@ let draft = null;
 let saves = [];
 let unlockedEndings = [];
 const ARCHIVE_TAB = { endings: '结局档案', canon: 'canon 总表', people: '人物档案' };
-let settings = { textScale: 1, motion: false, theme: 'dark' };
+let settings = { textScale: 1.25, motion: false, theme: 'dark' };
 let modalAfter = null;
 let activeAmbient = null;
 let sessionStart = Date.now();
@@ -124,7 +255,12 @@ function freshState() {
     log: [],
     ending: null,
     playtime: 0,
-    settings: { textScale: 1, motion: false, theme: 'dark' },
+    settings: { textScale: 1.25, motion: false, theme: 'dark' },
+    npcTalk: {},
+    identityClues: [],
+    identitySeen: [],
+    pendingIdentity: null,
+    pendingFog: false,
     createdAt: Date.now()
   };
 }
@@ -151,7 +287,8 @@ function loadSettings() {
 }
 function applySettings() {
   document.documentElement.style.setProperty('--text-scale', String(settings.textScale || 1));
-  document.documentElement.style.setProperty('--read-scale', String(settings.textScale || 1));
+  document.documentElement.style.setProperty('--ui-zoom', String(settings.textScale || 1));
+  document.documentElement.style.setProperty('--read-scale', '1');
   document.body.dataset.motion = settings.motion ? 'reduced' : '';
   document.body.dataset.theme = settings.theme === 'light' ? 'light' : 'dark';
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -200,7 +337,7 @@ function allEndings() {
   const a = (window.OC_APOCALYPSE && window.OC_APOCALYPSE.endings) || { ordinary: [], core: [] };
   const z = (window.OC_FOOL && window.OC_FOOL.endings) || { ordinary: [], core: [] };
   const seen = new Set();
-  return [].concat(DATA.endings.ordinary, b.ordinary || [], s.ordinary || [], t.ordinary || [], w.ordinary || [], f.ordinary || [], a.ordinary || [], z.ordinary || [], DATA.endings.core, b.core || [], s.core || [], t.core || [], w.core || [], f.core || [], a.core || [], z.core || [], DATA.endings.bad)
+  return [].concat(DATA.endings.ordinary, SCATTERED_ENDINGS, b.ordinary || [], s.ordinary || [], t.ordinary || [], w.ordinary || [], f.ordinary || [], a.ordinary || [], z.ordinary || [], DATA.endings.core, b.core || [], s.core || [], t.core || [], w.core || [], f.core || [], a.core || [], z.core || [], DATA.endings.bad)
     .filter(e => { if (!e || seen.has(e.id)) return false; seen.add(e.id); return true; });
 }
 function updatePlaytime() {
@@ -221,6 +358,9 @@ function snapshot() {
     afternoonAp: state.afternoonAp,
     player: JSON.parse(JSON.stringify(state.player)),
     relations: JSON.parse(JSON.stringify(state.relations)),
+    npcTalk: JSON.parse(JSON.stringify(state.npcTalk || {})),
+    identityClues: (state.identityClues || []).slice(),
+    identitySeen: (state.identitySeen || []).slice(),
     flags: JSON.parse(JSON.stringify(state.flags)),
     canonSeen: state.canonSeen.slice(),
     canonIntervened: state.canonIntervened.slice(),
@@ -310,6 +450,16 @@ function roll(attr, dc, salt) {
   const total = d6 + (state.player.attrs[attr] || 0) + bonus;
   return { d6, bonus, total, dc, success: total >= dc, attr };
 }
+function checkBonus(attr, salt) {
+  if (state.player.pathwayId === 'seer' && attr === 'insight') return 1;
+  if (state.player.pathwayId === 'corpse' && (salt.includes('asylum') || salt.includes('church') || salt.includes('grave'))) return 2;
+  return 0;
+}
+function chanceFor(attr, dc, salt = '') {
+  const need = dc - (state.player.attrs[attr] || 0) - checkBonus(attr, salt);
+  const faces = clamp(7 - need, 0, 6);
+  return Math.round(faces / 6 * 100);
+}
 function attrName(k) { return ATTR_LABEL[k] || k; }
 function effectTags(e = {}) {
   const map = { money: '金钱', health: '生命', humanity: '人性', madness: '疯狂', reputation: '声望', notoriety: '恶名', insight: '洞察', body: '体魄', spirit: '灵性', social: '社交', luck: '运气' };
@@ -324,7 +474,7 @@ function effectTags(e = {}) {
 function applyEffects(e = {}) {
   if (!state.player) return;
   const p = state.player;
-  if (e.money) p.money += e.money;
+  if (e.money) p.money = clamp(p.money + e.money, -999, 9999);
   if (e.health) p.health = clamp(p.health + e.health, 0, 10);
   if (e.humanity) p.humanity = clamp(p.humanity + e.humanity, 0, 10);
   if (e.madness) p.madness = clamp(p.madness + e.madness, 0, 10);
@@ -485,7 +635,7 @@ function buildPlayer() {
   const p = {
     name, originId: origin.id, originName: origin.name,
     pathwayId: pathway.id, pathwayName: pathway.name, ability: pathway.ability,
-    sequence: 9, attrs,
+    sequence: 9, attrs, materials: [], promotions: 0,
     flawId: flaw.id, flawName: flaw.name,
     contactId: contact.id, contactName: contact.name,
     lookId: look.id, lookName: look.name,
@@ -516,9 +666,74 @@ function startDay(first = false) {
   const due = regionCanon().filter(e => e.dayStart === state.day);
   state.pendingCanon = due.map(e => e.id);
   state.newspaper = makeNewspaper(due);
+  maybeIdentityClue();
+  maybeFogEvent();
   log(`第 ${state.day} 天开始。`);
   autoSave();
   render();
+}
+function maybeIdentityClue() {
+  if (!state.player || state.pendingIdentity || state.pendingFog) return;
+  const clue = IDENTITY_CLUES.find(c => c.region === state.region && state.day >= c.minDay && !state.identitySeen.includes(c.id));
+  if (clue) state.pendingIdentity = clue;
+}
+function openIdentityClue() {
+  const c = state.pendingIdentity;
+  if (!c) return;
+  openModal(`<div class="modal narrow identity-modal">
+    <div class="modal-head"><span class="head-icon">${icon('eye')}</span><div><h2>${esc(c.title)}</h2><p class="modal-sub">身份线索 · ${state.day} 天 · ${esc(regionLabel())}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body"><p class="scene-text">${esc(c.text)}</p><div class="identity-clue">“${esc(c.clue)}”</div><p class="small muted">你可以把这张脸和之前的名字连起来，也可以当作巧合。</p></div>
+    <div class="modal-foot"><button class="btn ghost small" data-act="identity-choice" data-choice="dismiss">当作巧合</button><span class="spacer"></span><button class="btn primary small" data-act="identity-choice" data-choice="remember">${icon('eye')}记住这张脸</button></div>
+  </div>`);
+}
+function resolveIdentityClue(choice) {
+  const c = state.pendingIdentity;
+  if (!c) return;
+  state.identitySeen.push(c.id);
+  state.pendingIdentity = null;
+  if (choice === 'remember') {
+    if (!state.identityClues.includes(c.clue)) state.identityClues.push(c.clue);
+    state.flags.kleinRecognized = true;
+    applyEffects({ insight: 1, madness: 1 });
+    log(`身份线索：${c.clue}`);
+    toast('你把这张脸记住了。', 'good');
+  } else {
+    state.flags.kleinSkeptic = true;
+    toast('你决定把它当作巧合。', '');
+  }
+  autoSave();
+  closeModal();
+  renderHub();
+}
+function maybeFogEvent() {
+  if (!state.player || state.pendingIdentity || state.pendingFog) return;
+  if (state.player.sequence <= 4 && !state.flags.blankCard && !state.flags.fogSeen) state.pendingFog = true;
+}
+function openFogCard() {
+  if (!state.pendingFog) return;
+  openModal(`<div class="modal narrow fog-modal">
+    <div class="modal-head"><span class="head-icon">${icon('moon')}</span><div><h2>灰雾中的空白卡牌</h2><p class="modal-sub">序列 ${state.player.sequence} · 灰雾在叫你</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body"><p class="scene-text">你听见灰雾深处有纸张翻动的声音。长桌上多了一张牌：没有图案，没有名字，只有一片空白。</p><div class="blank-card">${icon('mask')}<span>空白卡牌</span></div><p class="small muted">它像是在等你把自己的名字写上去。</p></div>
+    <div class="modal-foot"><button class="btn ghost small" data-act="fog-choice" data-choice="refuse">后退</button><span class="spacer"></span><button class="btn primary small" data-act="fog-choice" data-choice="accept">${icon('spark')}伸手触碰</button></div>
+  </div>`);
+}
+function resolveFogCard(choice) {
+  state.pendingFog = false;
+  state.flags.fogSeen = true;
+  if (choice === 'accept') {
+    state.flags.blankCard = true;
+    state.player.materials = state.player.materials || [];
+    if (!state.player.materials.includes('空白卡牌')) state.player.materials.push('空白卡牌');
+    applyEffects({ madness: 1, humanity: -1 });
+    log('你触碰了灰雾中的空白卡牌。');
+    toast('空白卡牌上，慢慢浮出你的名字。', 'good');
+  } else {
+    state.flags.fogRefused = true;
+    toast('你后退了一步。灰雾合拢。', '');
+  }
+  autoSave();
+  closeModal();
+  renderHub();
 }
 function skipToNextCanon() {
   if (!state || !state.player) return;
@@ -537,6 +752,34 @@ function debugSetDay(n) {
   state.day = clamp(Number(n) || 1, 1, state.maxDay || 120);
   state.pendingCanon = [];
   startDay();
+}
+function debugSetSequence(n) {
+  if (!state || !state.player) return;
+  state.player.sequence = clamp(Number(n) || 0, 0, 9);
+  maybeFogEvent();
+  renderHub();
+}
+function debugGrant(money = 0, acting = 0, material = '') {
+  if (!state || !state.player) return;
+  state.player.money = clamp((state.player.money || 0) + money, -999, 9999);
+  state.player.acting = (state.player.acting || 0) + acting;
+  if (material) { state.player.materials = state.player.materials || []; if (!state.player.materials.includes(material)) state.player.materials.push(material); }
+  renderHub();
+}
+function debugStress(days = 900) {
+  if (!state || !state.player) return { errors: ['no state'] };
+  const errors = [];
+  for (let d = 0; d < days; d++) {
+    for (let a = 0; a < 5; a++) {
+      applyEffects({ money: 4, body: 1, insight: 1, health: -1, social: 1, reputation: 1, madness: 1 });
+      const p = state.player;
+      if (!Number.isFinite(p.money) || !Number.isFinite(p.attrs.spirit) || !Number.isFinite(p.attrs.body) || !Number.isFinite(p.health) || !Number.isFinite(p.madness)) errors.push(`nan:${d}:${a}`);
+      if (p.money < -999 || p.money > 9999) errors.push(`money:${p.money}`);
+      if (p.health < 0 || p.health > 10 || p.madness < 0 || p.madness > 10) errors.push(`vital:${p.health}:${p.madness}`);
+      for (const k of ['spirit', 'body', 'insight', 'social', 'luck']) if (p.attrs[k] < 0 || p.attrs[k] > 10) errors.push(`attr:${k}:${p.attrs[k]}`);
+    }
+  }
+  return { days, errors: Array.from(new Set(errors)).slice(0, 20), sample: { money: state.player.money, attrs: state.player.attrs, health: state.player.health, madness: state.player.madness } };
 }
 function makeNewspaper(due) {
   const p = state.player;
@@ -667,6 +910,8 @@ function renderHub() {
     </aside>
     <section class="hub-center">
       <div class="hub-head"><div><p class="kicker">${regionLabel().toUpperCase()} · DAY ${state.day}</p><h1>今天去哪里？</h1></div><div class="ap-display"><b>${state.ap}</b><span>行动点</span></div></div>
+      ${state.pendingIdentity ? `<button class="event-notice identity-notice" data-act="identity-clue">${icon('eye')}<span><b>身份线索：${esc(state.pendingIdentity.title)}</b><small>你注意到一个不该重复出现的名字。</small></span><em>查看</em></button>` : ''}
+      ${state.pendingFog ? `<button class="event-notice fog-notice" data-act="fog-card">${icon('moon')}<span><b>灰雾在叫你</b><small>长桌上出现了一张没有名字的空白卡牌。</small></span><em>靠近</em></button>` : ''}
       <div class="map-grid">${locCards}</div>
       <div class="hub-hint">${state.ap > 0 ? `选择一个地点行动。今天还有 ${state.ap} 个行动点；也可用日常安排上课/打工/训练。` : '行动点用完了。回水仙花街休息，或直接结束今天。'}</div>
       <div class="hub-bottom">
@@ -674,6 +919,7 @@ function renderHub() {
         <button class="btn ghost small" data-act="relations">${icon('heart')}关系档案</button>
         <button class="btn ghost small" data-act="canon-list">${icon('eye')}canon 追踪</button>
         <button class="btn ghost small" data-act="archive">${icon('stack')}档案库</button>
+        <button class="btn ghost small" data-act="sequence">${icon('spark')}序列晋升</button>
         <button class="btn ghost small" data-act="skip-canon">${icon('clock')}跳到下一事件</button>
         <span class="spacer"></span>
         <button class="btn ${state.ap <= 0 ? 'primary' : 'ghost'} small" data-act="end-day">${icon('moon')}结束今天</button>
@@ -682,7 +928,7 @@ function renderHub() {
     <aside class="hub-right">
       <section class="profile-mini ink-panel">
         <div class="mini-sigil ${'sig-' + p.pathwayId}">${icon('mask')}</div>
-        <div><p class="kicker">${esc(p.pathwayName)} · 序列 ${p.sequence}</p><h2>${esc(p.name)}</h2><p class="small">${esc(p.originName)} · ${esc(p.flawName)}</p></div>
+        <div><p class="kicker">${esc(p.pathwayName)} · 序列 ${p.sequence} ${sequenceName(p.sequence)}</p><h2>${esc(p.name)}</h2><p class="small">${esc(p.originName)} · ${esc(p.flawName)}</p><div class="profile-actions"><button class="btn ghost small" data-act="character">${icon('person')}角色卡</button><button class="btn ghost small sequence-link" data-act="sequence">${icon('spark')}序列晋升</button></div></div>
       </section>
       <section class="relations-panel ink-panel">
         <div class="panel-head"><span>关系</span><span>${icon('heart')}</span></div>
@@ -801,10 +1047,12 @@ function openLocation(id) {
   const npcs = (regionNpcLocations()[id] || []).map(nid => regionNPCs().find(n => n.id === nid)).filter(Boolean);
   const rows = actions.map(a => {
     const disabled = state.ap <= 0;
-    const check = a.check ? `<span class="action-check">${attrName(a.check.attr)} DC ${a.check.dc}</span>` : '';
+    const chance = a.check ? `<span class="action-chance">成功率 ${chanceFor(a.check.attr, a.check.dc, `${id}:${a.id}`)}%</span>` : '';
+    const check = a.check ? `<span class="action-check">${attrName(a.check.attr)} DC ${a.check.dc}</span>${chance}` : '';
+    const preview = a.effects ? `<span class="action-effects">${effectTags(a.effects)}</span>` : '';
     return `<button class="action-row" data-act="do-action" data-loc="${id}" data-id="${a.id}" ${disabled ? 'disabled' : ''}>
       <span class="action-name">${esc(a.label)}${check}</span>
-      <span class="action-desc">${esc(a.desc)}</span>
+      <span class="action-desc">${esc(a.desc)}${preview}</span>
       <span class="action-cost">${a.openBoard ? '免费' : '1 行动'}</span>
     </button>`;
   }).join('');
@@ -817,22 +1065,22 @@ function openLocation(id) {
   }
   if (activeHere) {
     extras.push(`<button class="action-row commission-action" data-act="resolve-commission" ${state.ap <= 0 ? 'disabled' : ''}>
-      <span class="action-name">${icon('star')}处理委托：${esc(activeHere.title)}<span class="action-check">${attrName(activeHere.check.attr)} DC ${activeHere.check.dc}</span></span>
-      <span class="action-desc">${esc(activeHere.desc)}</span><span class="action-cost">1 行动</span>
+      <span class="action-name">${icon('star')}处理委托：${esc(activeHere.title)}<span class="action-check">${attrName(activeHere.check.attr)} DC ${activeHere.check.dc}</span><span class="action-chance">成功率 ${chanceFor(activeHere.check.attr, activeHere.check.dc, `commission:${activeHere.id}`)}%</span></span>
+      <span class="action-desc">${esc(activeHere.desc)}<span class="action-gain">报酬 ${activeHere.reward} 镑${activeHere.material ? ` · 材料：${activeHere.material}` : ''}</span></span><span class="action-cost">1 行动</span>
     </button>`);
   }
   const ambient = regionAmbient().filter(a => a.location === id);
   const daily = [
-    { id: 'study', name: '去上课 / 自学', desc: '读书、做笔记，或者听一堂听不懂的课。', check: '洞察 DC 8', effects: '洞察 +1' },
-    { id: 'work', name: '打零工', desc: '搬货、跑腿、洗盘子。钱不多，但能活。', check: '体魄 DC 8', effects: '金钱 +4 · 体魄 +1 · 生命 -1' },
-    { id: 'train', name: '训练', desc: '跑步、举重、练习拔枪。', check: '体魄 DC 9', effects: '体魄 +1 · 生命 -1' },
-    { id: 'social', name: '社交 / 认识人', desc: '去酒馆、沙龙或教堂，和陌生人说话。', check: '社交 DC 8', effects: '社交 +1 · 声望 +1 · 可能认识次要 NPC' }
+    { id: 'study', name: '去上课 / 自学', desc: '读书、做笔记，或者听一堂听不懂的课。', check: '洞察 DC 8', attr: 'insight', dc: 8, effects: '洞察 +1' },
+    { id: 'work', name: '打零工', desc: '搬货、跑腿、洗盘子。钱不多，但能活。', check: '体魄 DC 8', attr: 'body', dc: 8, effects: '金钱 +4 · 体魄 +1 · 生命 -1' },
+    { id: 'train', name: '训练', desc: '跑步、举重、练习拔枪。', check: '体魄 DC 9', attr: 'body', dc: 9, effects: '体魄 +1 · 生命 -1' },
+    { id: 'social', name: '社交 / 认识人', desc: '去酒馆、沙龙或教堂，和陌生人说话。', check: '社交 DC 8', attr: 'social', dc: 8, effects: '社交 +1 · 声望 +1 · 可能认识次要 NPC' }
   ];
   extras.push(`<div class="daily-divider">日常安排 · 微养成</div>`);
   for (const d of daily) {
     extras.push(`<button class="action-row daily-action" data-act="daily" data-loc="${id}" data-id="${d.id}" ${state.ap <= 0 ? 'disabled' : ''}>
-      <span class="action-name">${icon(d.id === 'study' ? 'book' : d.id === 'work' ? 'star' : d.id === 'train' ? 'shield' : 'heart')}${d.name}<span class="action-check">${d.check}</span></span>
-      <span class="action-desc">${d.desc}</span><span class="action-cost">1 行动</span>
+      <span class="action-name">${icon(d.id === 'study' ? 'book' : d.id === 'work' ? 'star' : d.id === 'train' ? 'shield' : 'heart')}${d.name}<span class="action-check">${d.check}</span><span class="action-chance">成功率 ${chanceFor(d.attr, d.dc, `daily:${id}:${d.id}`)}%</span></span>
+      <span class="action-desc">${d.desc}<span class="action-gain">${d.id === 'work' ? '收益：' : ''}${d.effects}</span></span><span class="action-cost">1 行动</span>
     </button>`);
   }
   if (ambient.length) extras.push(`<button class="action-row" data-act="wander" data-loc="${id}" ${state.ap <= 0 ? 'disabled' : ''}><span class="action-name">${icon('search')}在附近转转</span><span class="action-desc">不一定发生什么，但${regionLabel()}从不缺怪事。</span><span class="action-cost">1 行动</span></button>`);
@@ -985,15 +1233,34 @@ function failureText(action, check) {
   return '运气没有站在你这边。你只拿到了一半的答案。';
 }
 function showActionResult(title, text, effects, check, after) {
+  const dieId = 'check-die-' + Date.now() + '-' + Math.floor(Math.random() * 999);
   const checkHtml = check ? `<div class="check-line ${check.success ? 'ok' : 'fail'}">
-    <div class="check-die-wrap"><span class="check-die" data-face="${check.d6}">${check.d6}</span><span class="die-label">d6</span></div>
-    <div class="check-math"><span>${attrName(check.attr)}判定</span><b>${check.d6} + ${state.player.attrs[check.attr]}${check.bonus ? ` + ${check.bonus}` : ''} = ${check.total}</b><small>DC ${check.dc} · ${check.success ? '成功' : '失败'}</small></div>
+    <div class="check-die-wrap"><span class="check-die rolling" id="${dieId}" data-final="${check.d6}">?</span><span class="die-label">d6</span></div>
+    <div class="check-math rolling"><span>${attrName(check.attr)}判定</span><b>${check.d6} + ${state.player.attrs[check.attr]}${check.bonus ? ` + ${check.bonus}` : ''} = ${check.total}</b><small>DC ${check.dc} · ${check.success ? '成功' : '失败'}</small></div>
   </div>` : '';
   openModal(`<div class="modal narrow">
     <div class="modal-head"><span class="head-icon">${icon(check && !check.success ? 'drop' : 'feather')}</span><div><h2>${esc(title)}</h2><p class="modal-sub">第 ${state.day} 天 · ${esc(locationName(state._lastLocation || 'home'))}</p></div><button class="modal-close" data-act="close-result">${icon('close')}</button></div>
     <div class="modal-body"><p class="scene-text">${esc(text)}</p>${checkHtml}<div class="effect-tags">${effectTags(effects)}</div><div class="result-note">${state.ap <= 0 ? '行动点用完了。接下来是夜晚。' : `还剩 ${state.ap} 个行动点。`}</div></div>
     <div class="modal-foot"><span class="spacer"></span><button class="btn primary small" data-act="close-result">继续</button></div>
   </div>`, after);
+  if (!check) return;
+  const die = document.getElementById(dieId);
+  const math = die ? die.closest('.check-line')?.querySelector('.check-math') : null;
+  const settle = () => {
+    if (!die || !die.isConnected) return;
+    die.textContent = String(check.d6);
+    die.classList.remove('rolling');
+    die.classList.add('settled');
+    if (math) { math.classList.remove('rolling'); math.classList.add('settled'); }
+  };
+  if (state.settings.motion) { settle(); return; }
+  let tick = 0;
+  const iv = setInterval(() => {
+    if (!die || !die.isConnected) { clearInterval(iv); return; }
+    die.textContent = String(1 + Math.floor(Math.random() * 6));
+    die.style.setProperty('--tick', String(tick++));
+  }, 72);
+  setTimeout(() => { clearInterval(iv); settle(); }, 760);
 }
 function openRetire() {
   const candidates = endingCandidates(true);
@@ -1011,13 +1278,13 @@ function openFinal() {
   else if (state.region === 'apocalypse') next = { next: 'fool', label: '前往源堡 · 第八段' };
   const titles = { tingen: '廷根结算', backlund: '贝克兰德结算', sea: '海上结算', south: '南大陆结算', war: '战争结算', forsaken: '神弃之地结算', apocalypse: '末日结算', fool: '愚者结算' };
   const texts = {
-    tingen: '你活到了第 30 天。廷根还在，你也还在。你可以留在这里结算，也可以去贝克兰德继续追因斯。',
-    backlund: '贝克兰德的雾还在。你活过了这 14 天。现在，你可以留下结算，也可以登上那条没有灯的船。',
-    sea: '海风吹散了雾。你活过了这 10 天。现在，你可以留下结算，也可以去南大陆看看死人怎么生活。',
-    south: '拜朗的太阳落下去。你活过了这 8 天。现在，你可以留下结算，也可以去前线看看活人怎么死。',
-    war: '炮声停了。你活过了这 8 天。现在，你可以留下结算，也可以去神弃之地看看没有太阳的人怎么活。',
-    forsaken: '你活过了这 6 天。白银城的灯还亮着。现在，你可以留下，也可以去末日看看门后有什么。',
-    apocalypse: '你活过了这 5 天。末日没有结束，但门还没有完全打开。现在，你可以去源堡写最后一页。',
+    tingen: '你活到了第 120 天。廷根还在，你也还在。你可以留在这里结算，也可以去贝克兰德继续追因斯。',
+    backlund: '贝克兰德的雾还在。你活过了这 180 天。现在，你可以留下结算，也可以登上那条没有灯的船。',
+    sea: '海风吹散了雾。你活过了这 180 天。现在，你可以留下结算，也可以去南大陆看看死人怎么生活。',
+    south: '拜朗的太阳落下去。你活过了这 120 天。现在，你可以留下结算，也可以去前线看看活人怎么死。',
+    war: '炮声停了。你活过了这 120 天。现在，你可以留下结算，也可以去神弃之地看看没有太阳的人怎么活。',
+    forsaken: '你活过了这 90 天。白银城的灯还亮着。现在，你可以留下，也可以去末日看看门后有什么。',
+    apocalypse: '你活过了这 60 天。末日没有结束，但门还没有完全打开。现在，你可以去源堡写最后一页。',
     fool: '你走到了最后一页。现在，你要决定愚者是否沉眠。'
   };
   openEndingChooser(candidates, titles[state.region] || '结算', texts[state.region] || '', next);
@@ -1033,7 +1300,7 @@ function endingCandidates(retireOnly = false) {
   if (list.length) return list;
   const pool = regionEndings();
   for (const e of pool.ordinary) {
-    if (e.region && e.region !== state.region) continue;
+    if (e.region && e.region !== 'any' && e.region !== state.region) continue;
     if (!e.region && state.region !== 'tingen') continue;
     if (ordinaryOk(e)) list.push(e);
   }
@@ -1057,6 +1324,7 @@ function ordinaryOk(e) {
   if (c.insight !== undefined && p.attrs.insight < c.insight) return false;
   if (c.acting !== undefined && p.acting < c.acting) return false;
   if (c.notoriety !== undefined && p.notoriety < c.notoriety) return false;
+  if (c.flags && !c.flags.every(f => state.flags[f])) return false;
   return true;
 }
 function coreOk(e) {
@@ -1133,7 +1401,7 @@ function openCanon(id) {
       <div class="canon-canon"><span class="kicker">CANON</span><p>${esc(e.canon)}</p></div>
       <div class="canon-news">${icon('book')} ${esc(e.newspaper)}</div>
       <p class="scene-text">你可以介入，也可以只是看着。无论选什么，这件事都会留下记录。</p>
-      <div class="choice-list">${choices.map((c, i) => `<button class="oc-choice" data-act="canon-choice" data-id="${id}" data-i="${i}" ${state.ap <= 0 ? 'disabled' : ''}><span>${esc(c.label)}</span><small>${esc(c.hint || '')}</small><em>${effectTags(c.effects)} ${c.check ? `<span class="action-check">${attrName(c.check.attr)} DC ${c.check.dc}</span>` : ''}</em></button>`).join('')}</div>
+      <div class="choice-list">${choices.map((c, i) => `<button class="oc-choice" data-act="canon-choice" data-id="${id}" data-i="${i}" ${state.ap <= 0 ? 'disabled' : ''}><span>${esc(c.label)}</span><small>${esc(c.hint || '')}</small><em>${effectTags(c.effects)} ${c.check ? `<span class="action-check">${attrName(c.check.attr)} DC ${c.check.dc}</span><span class="action-chance">成功率 ${chanceFor(c.check.attr, c.check.dc, `canon:${id}:${i}`)}%</span>` : ''}</em></button>`).join('')}</div>
     </div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">介入消耗 1 行动点 · 剩余 ${state.ap}/${DAILY_AP}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再想想</button></div>
   </div>`);
@@ -1178,7 +1446,9 @@ function openCommissionBoard() {
     return `<div class="commission-card ${done ? 'done' : ''} ${isActive ? 'active' : ''}">
       <div class="commission-head"><b>${esc(c.title)}</b><span>${esc(locationName(c.location))}</span></div>
       <p>${esc(c.desc)}</p>
-      <div class="commission-meta"><span>${attrName(c.check.attr)} DC ${c.check.dc}</span><span>${c.days} 天</span><span>${c.reward} 镑</span></div>
+      <div class="commission-meta"><span>${attrName(c.check.attr)} DC ${c.check.dc}</span><span>成功率 ${chanceFor(c.check.attr, c.check.dc, `commission:${c.id}`)}%</span><span>${c.days} 天</span><span>${c.reward} 镑</span></div>
+      ${c.effects ? `<div class="commission-gain">${effectTags(c.effects)}</div>` : ''}
+      ${c.material ? `<div class="commission-material">材料：${esc(c.material)}</div>` : ''}
       ${done ? '<span class="commission-done">已完成</span>' : isActive ? '<span class="commission-done">进行中</span>' : `<button class="btn small" data-act="accept-commission" data-id="${c.id}" ${active ? 'disabled' : ''}>接受</button>`}
     </div>`;
   }).join('');
@@ -1206,13 +1476,18 @@ function resolveCommission() {
   spendAp();
   const check = roll(c.check.attr, c.check.dc, `commission:${c.id}`);
   if (check.success) {
-    applyEffects({ money: c.reward, reputation: c.rep || 0, notoriety: c.notoriety || 0, relations: c.relations || {}, madness: c.madness || 0, humanity: c.humanity || 0 });
+    const rewardEffects = Object.assign({}, c.effects || {}, { money: c.reward, reputation: c.rep || 0, notoriety: c.notoriety || 0, relations: c.relations || {}, madness: c.madness || 0, humanity: c.humanity || 0 });
+    applyEffects(rewardEffects);
+    if (c.material) {
+      state.player.materials = state.player.materials || [];
+      if (!state.player.materials.includes(c.material)) state.player.materials.push(c.material);
+    }
     if (!state.completedCommissions.includes(c.id)) state.completedCommissions.push(c.id);
     log(`完成委托：${c.title}`);
     state.activeCommission = null;
     autoSave();
     if (checkFailure()) return;
-    showActionResult(c.title, '委托完成。对方把报酬推过来，没有多问。', { money: c.reward, reputation: c.rep || 0, notoriety: c.notoriety || 0 }, check, () => { if (state.ap <= 0) openNight(); else renderHub(); });
+    showActionResult(c.title, c.material ? `委托完成。对方把报酬和一封装着「${c.material}」的包裹推过来。` : '委托完成。对方把报酬推过来，没有多问。', rewardEffects, check, () => { if (state.ap <= 0) openNight(); else renderHub(); });
   } else {
     applyEffects({ notoriety: 1, health: -1 });
     log(`委托失败：${c.title}`);
@@ -1441,6 +1716,11 @@ async function loadSave(id) {
   if (!s) return;
   state = Object.assign(freshState(), JSON.parse(JSON.stringify(s.snapshot)));
   state.maxDay = state.maxDay || regionData().maxDay || 120;
+  state.npcTalk = state.npcTalk || {};
+  state.identityClues = state.identityClues || [];
+  state.identitySeen = state.identitySeen || [];
+  state.pendingIdentity = null;
+  state.pendingFog = false;
   if (state.morningAp === undefined) { state.morningAp = Math.min(2, state.ap || 0); state.afternoonAp = Math.max(0, (state.ap || 0) - state.morningAp); }
   settings = Object.assign({}, settings, state.settings || {});
   applySettings();
@@ -1493,12 +1773,81 @@ function importFile(file) {
   r.readAsText(file);
 }
 
+/* ---------- sequence advancement ---------- */
+function openSequence() {
+  if (!state.player) return;
+  const p = state.player;
+  p.materials = p.materials || [];
+  const task = SEQUENCE_TASKS[p.sequence];
+  const mat = task ? p.materials.includes(task.material) : false;
+  const actingOk = task ? (p.acting || 0) >= task.acting : false;
+  const body = task ? `
+    <div class="sequence-head"><span class="seq-badge">${p.sequence}</span><div><p class="kicker">SEQUENCE ${p.sequence}</p><h2>${sequenceName(p.sequence)} → ${sequenceName(task.to)}</h2><p class="modal-sub">${task.potion} · 需求：扮演 ${task.acting} 次 · 主材料 1 份</p></div></div>
+    <div class="sequence-req">
+      <div class="${actingOk ? 'ok' : ''}"><span>扮演</span><b>${p.acting || 0} / ${task.acting}</b></div>
+      <div class="${mat ? 'ok' : ''}"><span>主材料</span><b>${mat ? '已持有' : '缺失'}</b></div>
+      <div><span>推定 DC</span><b>${task.dc}</b></div>
+    </div>
+    <div class="sequence-materials"><span>材料清单</span>${p.materials.length ? p.materials.map(x => `<em>${esc(x)}</em>`).join('') : '<small>暂无材料；可在下方购买，或从长期委托获得。</small>'}</div>
+    <div class="sequence-actions">
+      <button class="btn ghost" data-act="buy-material">${icon('star')}购买「${esc(task.material)}」· ${task.cost} 镑</button>
+      <button class="btn primary" data-act="attempt-advance" ${mat && actingOk && state.ap > 0 ? '' : 'disabled'}>${icon('spark')}尝试晋升 · 1 行动 · 成功率 ${chanceFor('spirit', task.dc, `advance:${p.sequence}:${state.day}`)}%</button>
+    </div>
+    <p class="sequence-note">晋升失败会消耗材料并增加疯狂/伤害；成功则序列下降、扮演归零。</p>` : `<div class="sequence-head"><span class="seq-badge">0</span><div><p class="kicker">SEQUENCE 0</p><h2>愚者</h2><p class="modal-sub">你已经走到这条途径的尽头。</p></div></div>`;
+  openModal(`<div class="modal narrow sequence-modal">
+    <div class="modal-head"><span class="head-icon">${icon('spark')}</span><div><h2>序列晋升</h2><p class="modal-sub">${esc(p.pathwayName)} · ${esc(p.name)}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body">${body}</div>
+    <div class="modal-foot"><span class="small" style="color:#6d5740">长期委托会掉落主材料；也可以花钱在俱乐部/黑市买到。</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
+  </div>`);
+}
+function buySequenceMaterial() {
+  const p = state.player;
+  if (!p) return;
+  const task = SEQUENCE_TASKS[p.sequence];
+  if (!task) { toast('已经没有可晋升的序列。', ''); return; }
+  p.materials = p.materials || [];
+  if (p.materials.includes(task.material)) { toast('你已经有一份主材料了。', ''); return; }
+  if (p.money < task.cost) { toast(`还差 ${task.cost - p.money} 镑。`, 'danger'); return; }
+  applyEffects({ money: -task.cost });
+  p.materials.push(task.material);
+  autoSave();
+  toast(`买到了「${task.material}」。`, 'good');
+  openSequence();
+}
+function attemptAdvance() {
+  const p = state.player;
+  if (!p) return;
+  const task = SEQUENCE_TASKS[p.sequence];
+  if (!task) return;
+  p.materials = p.materials || [];
+  if ((p.acting || 0) < task.acting) { toast(`还需要扮演 ${task.acting - (p.acting || 0)} 次。`, 'danger'); return; }
+  if (!p.materials.includes(task.material)) { toast('缺少主材料。', 'danger'); return; }
+  if (state.ap <= 0) { toast('今天的行动点用完了。', 'danger'); return; }
+  spendAp();
+  const check = roll('spirit', task.dc, `advance:${p.sequence}:${state.day}`);
+  p.materials = p.materials.filter(x => x !== task.material);
+  if (check.success) {
+    p.sequence = task.to;
+    p.acting = 0;
+    p.promotions = (p.promotions || 0) + 1;
+    applyEffects({ spirit: 1, madness: 1 });
+    log(`晋升成功：序列 ${task.to} · ${sequenceName(task.to)}`);
+    autoSave();
+    showActionResult('晋升成功', `你喝下「${task.potion}」。灵性像被重新排列了一遍。你成为序列 ${task.to} · ${sequenceName(task.to)}。`, { spirit: 1, madness: 1 }, check, () => openSequence());
+  } else {
+    applyEffects({ madness: 2, health: -2 });
+    log(`晋升失败：序列 ${p.sequence}`);
+    autoSave();
+    showActionResult('晋升失败', '魔药在体内失控了一瞬。你活了下来，但听见了很多不属于自己的声音。', { madness: 2, health: -2 }, check, () => openSequence());
+  }
+}
+
 /* ---------- settings / about / npc ---------- */
 function openSettings() {
   openModal(`<div class="modal narrow">
     <div class="modal-head"><span class="head-icon">${icon('settings')}</span><div><h2>设置</h2><p class="modal-sub">阅读与本地数据</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><div class="settings-grid">
-      <div class="setting-row"><div><div class="s-label">字体大小</div><div class="s-desc">放大正文和主要界面文字，不改变地图列数。</div></div><div class="font-btns">${[1, 1.15, 1.3].map(v => `<button class="${settings.textScale === v ? 'on' : ''}" data-act="font-size" data-size="${v}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
+      <div class="setting-row"><div><div class="s-label">字体大小</div><div class="s-desc">放大正文和主要界面文字，不改变地图列数。</div></div><div class="font-btns">${[1, 1.25, 1.4].map(v => `<button class="${settings.textScale === v ? 'on' : ''}" data-act="font-size" data-size="${v}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
       <div class="setting-row"><div><div class="s-label">主题</div><div class="s-desc">白昼模式使用浅色纸面与深色文字；黑夜模式保持红月档案感。</div></div><div class="font-btns"><button class="${settings.theme !== 'light' ? 'on' : ''}" data-act="theme" data-theme="dark">黑夜</button><button class="${settings.theme === 'light' ? 'on' : ''}" data-act="theme" data-theme="light">白昼</button></div></div>
       <div class="setting-row"><div><div class="s-label">减少动效</div><div class="s-desc">关闭长过渡、掷骰旋转与闪烁。</div></div><button class="switch ${settings.motion ? 'on' : ''}" data-act="toggle-motion"></button></div>
       <div class="setting-row"><div><div class="s-label">存档</div><div class="s-desc">导出 JSON，或从备份导入。</div></div><div style="display:flex;gap:5px"><button class="btn ghost small" data-act="export-saves">${icon('download')}导出</button><button class="btn ghost small" data-act="pick-import">${icon('upload')}导入</button></div></div>
@@ -1526,11 +1875,33 @@ function openAbout() {
 function openNpc(id) {
   const n = regionNPCs().find(x => x.id === id);
   if (!n) return;
+  state.npcTalk = state.npcTalk || {};
   const r = state.relations[id] || 0;
-  openModal(`<div class="modal narrow">
-    <div class="modal-head"><span class="head-icon" style="border-color:${n.color};color:${n.color}">${icon('person')}</span><div><h2>${esc(n.name)}</h2><p class="modal-sub">${esc(n.role)} · ${relLabel(r)}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
-    <div class="modal-body"><p class="scene-text">${esc(n.desc)}</p><div class="relation-meter"><i style="width:${Math.min(100, (r + 5) * 10)}%"></i></div><p class="small muted">关系：${r} · 在对应地点行动可以提升。</p></div>
-    <div class="modal-foot"><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
+  const talk = npcTalkLine(n);
+  openModal(`<div class="modal narrow npc-modal">
+    <div class="modal-head"><span class="head-icon" style="border-color:${n.color};color:${n.color}">${icon('person')}</span><div><h2>${esc(n.name)}</h2><p class="modal-sub">${esc(n.role)} · ${relLabel(r)} · ${talk.season} ${talk.time}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body"><p class="scene-text">${esc(n.desc)}</p><div class="npc-dialogue" style="--c:${n.color}">“${esc(talk.text)}”</div><div class="npc-talk-meta">第 ${talk.count} 次交谈 · 关系 ${r} · ${talk.season}的${talk.time}</div><div class="relation-meter"><i style="width:${Math.min(100, (r + 5) * 10)}%"></i></div><p class="small muted">关系：${r} · 在对应地点行动可以提升。</p></div>
+    <div class="modal-foot"><button class="btn ghost small" data-act="npc" data-id="${id}">${icon('feather')}再聊一句</button><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
+  </div>`);
+}
+function openCharacter() {
+  if (!state.player) return;
+  const p = state.player;
+  const attr = (k) => `<div class="char-attr"><span>${ATTR_LABEL[k]}</span><b>${p.attrs[k]}</b><i style="width:${p.attrs[k] * 10}%"></i></div>`;
+  const mat = (p.materials || []).length ? p.materials.map(x => `<em>${esc(x)}</em>`).join('') : '<small>还没有主材料。长期委托和俱乐部黑市都能找到。</small>';
+  openModal(`<div class="modal character-modal">
+    <div class="modal-head"><span class="head-icon">${icon('person')}</span><div><h2>${esc(p.name)}</h2><p class="modal-sub">${esc(p.pathwayName)} · 序列 ${p.sequence} ${sequenceName(p.sequence)}</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body">
+      <div class="char-top"><span class="char-sigil ${'sig-' + p.pathwayId}">${icon('mask')}</span><div><b>${esc(p.originName)}</b><p>${esc(p.flawName)} · 扮演 ${p.acting || 0} 次 · 晋升 ${p.promotions || 0} 次</p></div></div>
+      <div class="char-attrs">${['spirit', 'body', 'insight', 'social', 'luck'].map(attr).join('')}</div>
+      <div class="char-resources">
+        <div><span>金钱</span><b>${p.money} 镑</b></div><div><span>生命</span><b>${p.health}/10</b></div><div><span>疯狂</span><b>${p.madness}/10</b></div><div><span>人性</span><b>${p.humanity}/10</b></div><div><span>声望</span><b>${p.reputation}</b></div><div><span>恶名</span><b>${p.notoriety}</b></div>
+      </div>
+      <div class="char-materials"><span>序列材料</span>${mat}</div>
+      <div class="char-identities"><span>身份线索</span>${(state.identityClues || []).length ? state.identityClues.map(x => `<em>${esc(x)}</em>`).join('') : '<small>你还没有拼出那个人的完整身份。</small>'}</div>
+      <div class="char-note">${p.sequence <= 4 ? '你已经走到很高的位置。灰雾开始注意你。' : '序列越高，越难回头。'}</div>
+    </div>
+    <div class="modal-foot"><span class="small" style="color:#6d5740">数值上限：属性 10 · 生命/疯狂/人性 10 · 声望/恶名 20</span><span class="spacer"></span><button class="btn primary small" data-act="close-modal">收起</button></div>
   </div>`);
 }
 function openRelations() {
@@ -1587,7 +1958,7 @@ function renderEndingArchive() {
   const a = (window.OC_APOCALYPSE && window.OC_APOCALYPSE.endings) || { ordinary: [], core: [] };
   const z = (window.OC_FOOL && window.OC_FOOL.endings) || { ordinary: [], core: [] };
   const groups = [
-    ['普通人的结局', all.filter(e => DATA.endings.ordinary.includes(e) || (b.ordinary || []).includes(e) || (s.ordinary || []).includes(e) || (t.ordinary || []).includes(e) || (w.ordinary || []).includes(e) || (f.ordinary || []).includes(e) || (a.ordinary || []).includes(e) || (z.ordinary || []).includes(e))],
+    ['普通人的结局', all.filter(e => DATA.endings.ordinary.includes(e) || SCATTERED_ENDINGS.includes(e) || (b.ordinary || []).includes(e) || (s.ordinary || []).includes(e) || (t.ordinary || []).includes(e) || (w.ordinary || []).includes(e) || (f.ordinary || []).includes(e) || (a.ordinary || []).includes(e) || (z.ordinary || []).includes(e))],
     ['核心结局', all.filter(e => DATA.endings.core.includes(e) || (b.core || []).includes(e) || (s.core || []).includes(e) || (t.core || []).includes(e) || (w.core || []).includes(e) || (f.core || []).includes(e) || (a.core || []).includes(e) || (z.core || []).includes(e))],
     ['坏结局', all.filter(e => DATA.endings.bad.includes(e))]
   ];
@@ -1694,7 +2065,7 @@ function init() {
     getScreen: () => state.screen,
     newGame, render, startDay, openLocation, performAction, openCanon, chooseCanon,
     openCommissionBoard, acceptCommission, resolveCommission, openFinal, showEnding,
-    startBacklund, startSea, startSouth, startWar, startForsaken, startApocalypse, startFool, skipToNextCanon, debugSetDay, saveGame, loadSave, day: () => state.day, region: () => state.region
+    startBacklund, startSea, startSouth, startWar, startForsaken, startApocalypse, startFool, skipToNextCanon, debugSetDay, debugSetSequence, debugGrant, debugStress, saveGame, loadSave, day: () => state.day, region: () => state.region
   };
 }
 document.addEventListener('click', (e) => {
@@ -1702,7 +2073,13 @@ document.addEventListener('click', (e) => {
   if (!el) return;
   const act = el.dataset.act;
   if (act === 'modal-backdrop') { if (e.target === el) closeModal(); return; }
-  if (act === 'close-modal') { closeModal(); return; }
+  if (act === 'close-modal') {
+    closeModal();
+    if (state.screen === 'hub') renderHub();
+    else if (state.screen === 'archive') renderArchive();
+    else if (state.screen === 'saves') renderSaves();
+    return;
+  }
   if (act === 'close-result') { closeModal(); return; }
   if (act === 'title') { if (state.player) { updatePlaytime(); autoSave(); } state.screen = 'title'; render(); return; }
   if (act === 'new') { newGame(); return; }
@@ -1735,6 +2112,14 @@ document.addEventListener('click', (e) => {
   if (act === 'accept-commission') { acceptCommission(el.dataset.id); return; }
   if (act === 'resolve-commission') { resolveCommission(); return; }
   if (act === 'skip-canon') { skipToNextCanon(); return; }
+  if (act === 'character') { openCharacter(); return; }
+  if (act === 'identity-clue') { openIdentityClue(); return; }
+  if (act === 'identity-choice') { resolveIdentityClue(el.dataset.choice); return; }
+  if (act === 'fog-card') { openFogCard(); return; }
+  if (act === 'fog-choice') { resolveFogCard(el.dataset.choice); return; }
+  if (act === 'sequence') { openSequence(); return; }
+  if (act === 'buy-material') { buySequenceMaterial(); return; }
+  if (act === 'attempt-advance') { attemptAdvance(); return; }
   if (act === 'end-day') { openNight(); return; }
   if (act === 'night-choice') { chooseNight(el.dataset.id); return; }
   if (act === 'pick-ending') { showEnding(el.dataset.id); return; }
