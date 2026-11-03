@@ -99,6 +99,7 @@ const LONG_COMMISSIONS = {
     { id: 'long-z-15', title: '灰雾巡游', location: 'fog', days: 15, check: { attr: 'spirit', dc: 12 }, reward: 60, effects: { spirit: 2, insight: 2 }, material: '灰雾结晶', desc: '十五天，在灰雾里找一张空椅子。没有人知道它属于谁。' }
   ]
 };
+for (const list of Object.values(LONG_COMMISSIONS)) for (const c of list) c.longTerm = true;
 const NPC_VOICE = {
   dunn: {
     cold: ['“有事就说。黑荆棘的门不锁。”', '“今天的咖啡不错。虽然我忘了是谁煮的。”'],
@@ -1443,13 +1444,14 @@ function openCommissionBoard() {
   const rows = regionCommissions().map(c => {
     const done = state.completedCommissions.includes(c.id);
     const isActive = active && active.id === c.id;
-    return `<div class="commission-card ${done ? 'done' : ''} ${isActive ? 'active' : ''}">
-      <div class="commission-head"><b>${esc(c.title)}</b><span>${esc(locationName(c.location))}</span></div>
+    const isLong = !!c.longTerm;
+    return `<div class="commission-card ${done ? 'done' : ''} ${isActive ? 'active' : ''} ${isLong ? 'long-commission' : ''}">
+      <div class="commission-head"><b>${esc(c.title)}</b><span>${isLong ? '长期 · 时间跳转' : esc(locationName(c.location))}</span></div>
       <p>${esc(c.desc)}</p>
-      <div class="commission-meta"><span>${attrName(c.check.attr)} DC ${c.check.dc}</span><span>成功率 ${chanceFor(c.check.attr, c.check.dc, `commission:${c.id}`)}%</span><span>${c.days} 天</span><span>${c.reward} 镑</span></div>
+      <div class="commission-meta"><span>${attrName(c.check.attr)} DC ${c.check.dc}</span><span>成功率 ${chanceFor(c.check.attr, c.check.dc, `commission:${c.id}${isLong ? ':long' : ''}`)}%</span><span>${isLong ? '跳过 ' : ''}${c.days} 天</span><span>${c.reward} 镑</span></div>
       ${c.effects ? `<div class="commission-gain">${effectTags(c.effects)}</div>` : ''}
       ${c.material ? `<div class="commission-material">材料：${esc(c.material)}</div>` : ''}
-      ${done ? '<span class="commission-done">已完成</span>' : isActive ? '<span class="commission-done">进行中</span>' : `<button class="btn small" data-act="accept-commission" data-id="${c.id}" ${active ? 'disabled' : ''}>接受</button>`}
+      ${done ? '<span class="commission-done">已完成</span>' : isActive ? '<span class="commission-done">进行中</span>' : `<button class="btn small" data-act="accept-commission" data-id="${c.id}" ${active && !isLong ? 'disabled' : ''}>${isLong ? `接取并跳过 ${c.days} 天` : '接受'}</button>`}
     </div>`;
   }).join('');
   openModal(`<div class="modal wide">
@@ -1458,10 +1460,49 @@ function openCommissionBoard() {
     <div class="modal-foot"><span class="small" style="color:#6d5740">${active ? `进行中：${esc(active.title)}` : '没有进行中的委托'}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
   </div>`);
 }
+function runLongCommission(c) {
+  if (!c || !c.longTerm) return;
+  const check = roll(c.check.attr, c.check.dc, `commission:${c.id}:long`);
+  const target = Math.min(state.maxDay, state.day + c.days);
+  const skipped = regionCanon().filter(e => e.dayStart > state.day && e.dayStart <= target);
+  for (const e of skipped) if (!state.canonSeen.includes(e.id)) state.canonSeen.push(e.id);
+  const rewardEffects = check.success
+    ? Object.assign({}, c.effects || {}, { money: c.reward })
+    : { notoriety: 1, health: -1 };
+  applyEffects(rewardEffects);
+  if (check.success) {
+    if (c.material) {
+      state.player.materials = state.player.materials || [];
+      if (!state.player.materials.includes(c.material)) state.player.materials.push(c.material);
+    }
+    if (!state.completedCommissions.includes(c.id)) state.completedCommissions.push(c.id);
+    log(`完成长期委托：${c.title}（跳过 ${c.days} 天）`);
+  } else {
+    log(`长期委托失败：${c.title}`);
+  }
+  state.activeCommission = null;
+  state._lastLocation = c.location;
+  state.day = target;
+  state.pendingCanon = [];
+  startDay();
+  autoSave();
+  if (checkFailure()) return;
+  const text = check.success
+    ? `你接下了「${c.title}」。${c.days} 天后，你带着报酬回来。时间被直接翻过去了，没有留下行动的余地。`
+    : `你接下了「${c.title}」。${c.days} 天后，事情没有办成。你带着伤和一点坏名声回来。`;
+  showActionResult(c.title, text, rewardEffects, check, () => {
+    if (state.day >= state.maxDay) openFinal(); else renderHub();
+  });
+}
 function acceptCommission(id) {
   if (state.activeCommission) { toast('你已经在处理一个委托了。', 'danger'); return; }
   const c = regionCommissions().find(x => x.id === id);
   if (!c) return;
+  if (c.longTerm) {
+    closeModal();
+    runLongCommission(c);
+    return;
+  }
   state.activeCommission = Object.assign({}, c, { acceptedDay: state.day });
   log(`接受委托：${c.title}`);
   autoSave();
