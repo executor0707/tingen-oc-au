@@ -12,7 +12,7 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const icon = (n, c = '') => `<svg class="icon ${c}" aria-hidden="true"><use href="#i-${n}"></use></svg>`;
 const DATA = window.OC_DATA;
-const CANON = (window.CANON_EVENTS || []).filter(e => e.volumeId === 1);
+const TINGEN_CANON = (window.CANON_EVENTS || []).filter(e => e.volumeId === 1);
 const SAVE_KEY = 'tingen_oc_saves_v1';
 const SETTINGS_KEY = 'tingen_oc_settings_v1';
 
@@ -27,6 +27,30 @@ const LOCATION_NPC = {
   church: ['frye']
 };
 
+function regionData() {
+  return (state && state.region === 'backlund' && window.OC_BACKLUND) ? window.OC_BACKLUND : DATA;
+}
+function regionLocations() { return regionData().locations || DATA.locations; }
+function regionNPCs() { return regionData().npcs || DATA.npcs; }
+function regionNpcLocations() { return regionData().npcLocations || LOCATION_NPC; }
+function regionActions() { return regionData().actions || DATA.actions; }
+function regionCommissions() { return regionData().commissions || DATA.commissions; }
+function regionAmbient() { return regionData().ambient || DATA.ambient; }
+function regionCanon() { return regionData().canon || TINGEN_CANON; }
+function regionPaper() { return regionData().paper || '廷根老实人报'; }
+function regionMaxDay() { return (state && state.region === 'backlund') ? 14 : 30; }
+function regionLabel() { return (state && state.region === 'backlund') ? '贝克兰德' : '廷根'; }
+function regionDateLabel() { return (state && state.region === 'backlund') ? '1349 年 9 月' : '1349 年 7 月'; }
+function regionEndings() {
+  const base = DATA.endings;
+  const extra = (window.OC_BACKLUND && window.OC_BACKLUND.endings) || { ordinary: [], core: [] };
+  return {
+    ordinary: [].concat(base.ordinary, extra.ordinary || []),
+    core: [].concat(base.core, extra.core || []),
+    bad: base.bad
+  };
+}
+
 let state = null;
 let draft = null;
 let saves = [];
@@ -39,6 +63,9 @@ function freshState() {
   return {
     version: 1,
     screen: 'title',
+    region: 'tingen',
+    act: 1,
+    maxDay: 30,
     day: 1,
     ap: 2,
     player: null,
@@ -104,6 +131,9 @@ function updatePlaytime() {
 function snapshot() {
   return {
     version: 1,
+    region: state.region,
+    act: state.act,
+    maxDay: state.maxDay,
     day: state.day,
     ap: state.ap,
     player: JSON.parse(JSON.stringify(state.player)),
@@ -131,7 +161,9 @@ function saveGame(type, slot, name) {
     id, type,
     name: type === 'auto' ? `${p.name} · 第 ${state.day} 天` : ((name || '').trim() || (old && old.name) || `${p.name} · 第 ${state.day} 天`),
     day: state.day,
-    location: '廷根',
+    maxDay: state.maxDay,
+    region: state.region,
+    location: regionLabel(),
     playerName: p.name,
     pathway: p.pathwayName,
     sequence: p.sequence,
@@ -139,7 +171,7 @@ function saveGame(type, slot, name) {
     madness: p.madness,
     money: p.money,
     updatedAt: Date.now(),
-    summary: (state.log[0] || '第 ' + state.day + ' 天，廷根。').slice(0, 120),
+    summary: (state.log[0] || '第 ' + state.day + ' 天，' + regionLabel() + '。').slice(0, 120),
     snapshot: snapshot()
   };
   const idx = saves.findIndex(s => s.id === id);
@@ -161,7 +193,7 @@ function toast(text, kind = '') {
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 240); }, 3200);
 }
 function openModal(html, after = null) {
-  modalAfter = after;
+  modalAfter = (typeof after === 'function') ? after : null;
   $('#modal-root').innerHTML = `<div class="modal-backdrop" data-act="modal-backdrop">${html}</div>`;
   const f = $('[data-autofocus]', $('#modal-root')) || $('.modal-close', $('#modal-root'));
   if (f) setTimeout(() => { try { f.focus(); } catch (e) {} }, 30);
@@ -170,7 +202,7 @@ function closeModal() {
   $('#modal-root').innerHTML = '';
   const after = modalAfter;
   modalAfter = null;
-  if (after) after();
+  if (typeof after === 'function') after();
 }
 function hashStr(str) {
   let h = 2166136261;
@@ -251,7 +283,7 @@ function renderTitle() {
           <button class="btn ghost" data-act="saves">${icon('save')}存档柜</button>
           <button class="btn ghost" data-act="about">${icon('book')}廷根指南</button>
         </div>
-        <div class="oc-meta"><span>30 天切片</span><span>序列 9 起步</span><span>12 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
+        <div class="oc-meta"><span>廷根 30 天 + 贝克兰德 14 天</span><span>序列 9 起步</span><span>24 个 canon 锚点</span><span>15+ / 恐怖与死亡</span></div>
       </div>
       <div class="oc-paper-prop paper">
         <div class="prop-head"><span>THE TINGEN HONEST MAN</span><span>1 PENNY</span></div>
@@ -374,7 +406,8 @@ function buildPlayer() {
     reputation: 0, notoriety: (flaw.mods && flaw.mods.notoriety) || 0, acting: 0
   };
   const relations = {};
-  for (const n of DATA.npcs) relations[n.id] = 0;
+  const allNpcs = DATA.npcs.concat((window.OC_BACKLUND && window.OC_BACKLUND.npcs) || []);
+  for (const n of allNpcs) relations[n.id] = 0;
   if (contact.mods && contact.mods.relations) for (const [k, v] of Object.entries(contact.mods.relations)) relations[k] = (relations[k] || 0) + v;
   state = freshState();
   state.player = p;
@@ -388,7 +421,7 @@ function startDay(first = false) {
   state.screen = 'hub';
   state.ap = 2;
   state.ending = null;
-  const due = CANON.filter(e => e.dayStart === state.day);
+  const due = regionCanon().filter(e => e.dayStart === state.day);
   state.pendingCanon = due.map(e => e.id);
   state.newspaper = makeNewspaper(due);
   log(`第 ${state.day} 天开始。`);
@@ -401,7 +434,9 @@ function makeNewspaper(due) {
   if (due && due.length) {
     news.push({ tag: 'CANON', text: due[0].newspaper, eventId: due[0].id });
   } else {
-    news.push({ tag: '本报', text: '黑荆棘安保公司称昨夜“只是加班”；佐特兰街居民表示已经习惯了。' });
+    news.push({ tag: '本报', text: state.region === 'backlund'
+      ? '贝克兰德桥区昨夜发生瓦斯泄漏；东区居民称雾里有人唱歌。'
+      : '黑荆棘安保公司称昨夜“只是加班”；佐特兰街居民表示已经习惯了。' });
   }
   if (p.notoriety >= 3) {
     news.push({ tag: '警方', text: `警方正在寻找一名${p.notoriety >= 6 ? '“极度危险”的' : ''}嫌疑人，特征：${p.lookName}，${p.pathwayName}。` });
@@ -416,7 +451,9 @@ function makeNewspaper(due) {
   } else if (p.reputation >= 4) {
     news.push({ tag: '社交', text: `本城一位“热心的${p.pathwayName}”最近很活跃；有人称赞，有人警惕。` });
   } else {
-    news.push({ tag: '传闻', text: '占卜俱乐部称，红月最近“只是天气现象”；教会未予置评。' });
+    news.push({ tag: '传闻', text: state.region === 'backlund'
+      ? '皇后区沙龙称，雾霾只是“天气问题”；东区诊所没有置评。'
+      : '占卜俱乐部称，红月最近“只是天气现象”；教会未予置评。' });
   }
   return news.slice(0, 3);
 }
@@ -426,8 +463,8 @@ function hud() {
   const p = state.player;
   if (!p) return '';
   return `<header class="oc-hud">
-    <button class="oc-brand" data-act="title">${icon('moon')}<span>廷根异闻<small>DAY ${String(state.day).padStart(2, '0')} / 30</small></span></button>
-    <div class="hud-day"><b>${String(state.day).padStart(2, '0')}</b><span>日 / 30</span></div>
+    <button class="oc-brand" data-act="title">${icon('moon')}<span>${regionLabel()}异闻<small>DAY ${String(state.day).padStart(2, '0')} / ${state.maxDay || 30}</small></span></button>
+    <div class="hud-day"><b>${String(state.day).padStart(2, '0')}</b><span>日 / ${state.maxDay || 30}</span></div>
     <div class="hud-res">
       <span class="res"><i>${icon('spark')}</i>行动 ${state.ap}/2</span>
       <span class="res money" title="金钱">${icon('star')}${p.money} 镑</span>
@@ -446,13 +483,13 @@ function renderHub() {
   state.screen = 'hub';
   const p = state.player;
   if (!p) { state.screen = 'title'; return renderTitle(); }
-  const canonToday = state.pendingCanon.map(id => CANON.find(e => e.id === id)).filter(Boolean);
-  const npcRows = DATA.npcs.map(n => {
+  const canonToday = state.pendingCanon.map(id => regionCanon().find(e => e.id === id)).filter(Boolean);
+  const npcRows = regionNPCs().map(n => {
     const r = state.relations[n.id] || 0;
     return `<div class="relation-row"><span class="rel-dot" style="--c:${n.color}"></span><span>${esc(n.name)}</span><b>${relLabel(r)}</b></div>`;
   }).join('');
-  const locCards = DATA.locations.map(loc => {
-    const npcs = (LOCATION_NPC[loc.id] || []).map(id => DATA.npcs.find(n => n.id === id)).filter(Boolean);
+  const locCards = regionLocations().map(loc => {
+    const npcs = (regionNpcLocations()[loc.id] || []).map(id => regionNPCs().find(n => n.id === id)).filter(Boolean);
     const canonHere = canonToday.filter(e => canonLocationId(e) === loc.id);
     const activeHere = state.activeCommission && state.activeCommission.location === loc.id;
     return `<button class="loc-card" data-act="open-location" data-id="${loc.id}" style="--loc:${loc.color}">
@@ -472,9 +509,9 @@ function renderHub() {
   <main class="hub-layout">
     <aside class="hub-left">
       <section class="newspaper-card paper">
-        <div class="paper-mast"><span>THE TINGEN HONEST MAN</span><span>1 PENNY</span></div>
-        <h2>廷根老实人报</h2>
-        <div class="paper-date">1349 年 · 第 ${state.day} 天</div>
+        <div class="paper-mast"><span>${state.region === 'backlund' ? 'THE BACKLUND DAILY' : 'THE TINGEN HONEST MAN'}</span><span>1 PENNY</span></div>
+        <h2>${esc(regionPaper())}</h2>
+        <div class="paper-date">${regionDateLabel()} · 第 ${state.day} 天</div>
         ${newspaper}
         <button class="btn ghost small wide" data-act="newspaper">${icon('book')}展开今日报纸</button>
       </section>
@@ -494,7 +531,7 @@ function renderHub() {
       </section>`}
     </aside>
     <section class="hub-center">
-      <div class="hub-head"><div><p class="kicker">TINGEN · DAY ${state.day}</p><h1>今天去哪里？</h1></div><div class="ap-display"><b>${state.ap}</b><span>行动点</span></div></div>
+      <div class="hub-head"><div><p class="kicker">${regionLabel().toUpperCase()} · DAY ${state.day}</p><h1>今天去哪里？</h1></div><div class="ap-display"><b>${state.ap}</b><span>行动点</span></div></div>
       <div class="map-grid">${locCards}</div>
       <div class="hub-hint">${state.ap > 0 ? '选择一个地点行动。用完 2 个行动点后进入夜晚。' : '行动点用完了。回水仙花街休息，或直接结束今天。'}</div>
       <div class="hub-bottom">
@@ -530,9 +567,16 @@ function relLabel(r) {
   if (r <= -1) return '警惕';
   return '陌生';
 }
-function locationName(id) { const l = DATA.locations.find(x => x.id === id); return l ? l.name : id; }
+function locationName(id) { const l = regionLocations().find(x => x.id === id); return l ? l.name : id; }
 function canonLocationId(e) {
   const s = (e.location || '') + (e.title || '');
+  if (state.region === 'backlund') {
+    if (s.includes('东区') || s.includes('码头') || s.includes('塔索克')) return 'docks';
+    if (s.includes('皇后区') || s.includes('西区') || s.includes('沙龙')) return 'west';
+    if (s.includes('大学') || s.includes('书库') || s.includes('图书馆')) return 'university';
+    if (s.includes('教堂') || s.includes('墓园')) return 'church';
+    return 'detective';
+  }
   if (s.includes('黑荆棘') || s.includes('佐特兰')) return 'blackthorn';
   if (s.includes('占卜') || s.includes('豪尔斯')) return 'club';
   if (s.includes('疯人院')) return 'asylum';
@@ -546,13 +590,13 @@ function canonLocationId(e) {
 function openNewspaper() {
   const rows = state.newspaper.map(n => `<div class="news-line"><span class="news-tag">${esc(n.tag)}</span><p>${esc(n.text)}</p></div>`).join('');
   openModal(`<div class="modal narrow newspaper-modal">
-    <div class="modal-head"><span class="head-icon">${icon('book')}</span><div><h2>廷根老实人报</h2><p class="modal-sub">1349 年 · 第 ${state.day} 天 · 1 便士</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
-    <div class="modal-body"><div class="paper-mast"><span>THE TINGEN HONEST MAN</span><span>1 PENNY</span></div>${rows}<div class="prop-small">分类广告：占卜、寻物、保镖、葬礼花圈。价格面议。</div></div>
+    <div class="modal-head"><span class="head-icon">${icon('book')}</span><div><h2>${esc(regionPaper())}</h2><p class="modal-sub">${regionDateLabel()} · 第 ${state.day} 天 · 1 便士</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-body"><div class="paper-mast"><span>${state.region === 'backlund' ? 'THE BACKLUND DAILY' : 'THE TINGEN HONEST MAN'}</span><span>1 PENNY</span></div>${rows}<div class="prop-small">分类广告：占卜、寻物、保镖、葬礼花圈。价格面议。</div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">报纸只写它“知道”的，不写它“猜到”的。</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起报纸</button></div>
   </div>`);
 }
 function openCanonList() {
-  const rows = CANON.map(e => {
+  const rows = regionCanon().map(e => {
     const seen = state.canonSeen.includes(e.id);
     const inter = state.canonIntervened.includes(e.id);
     return `<div class="canon-row ${seen ? 'seen' : ''} ${inter ? 'intervened' : ''}">
@@ -570,12 +614,12 @@ function openCanonList() {
 
 /* ---------- location / actions ---------- */
 function openLocation(id) {
-  const loc = DATA.locations.find(l => l.id === id);
+  const loc = regionLocations().find(l => l.id === id);
   if (!loc) return;
-  const actions = (DATA.actions[id] || []).slice();
+  const actions = (regionActions()[id] || []).slice();
   const activeHere = state.activeCommission && state.activeCommission.location === id ? state.activeCommission : null;
-  const canonHere = state.pendingCanon.map(eid => CANON.find(e => e.id === eid)).filter(e => e && canonLocationId(e) === id);
-  const npcs = (LOCATION_NPC[id] || []).map(nid => DATA.npcs.find(n => n.id === nid)).filter(Boolean);
+  const canonHere = state.pendingCanon.map(eid => regionCanon().find(e => e.id === eid)).filter(e => e && canonLocationId(e) === id);
+  const npcs = (regionNpcLocations()[id] || []).map(nid => regionNPCs().find(n => n.id === nid)).filter(Boolean);
   const rows = actions.map(a => {
     const disabled = state.ap <= 0;
     const check = a.check ? `<span class="action-check">${attrName(a.check.attr)} DC ${a.check.dc}</span>` : '';
@@ -598,7 +642,7 @@ function openLocation(id) {
       <span class="action-desc">${esc(activeHere.desc)}</span><span class="action-cost">1 行动</span>
     </button>`);
   }
-  const ambient = DATA.ambient.filter(a => a.location === id);
+  const ambient = regionAmbient().filter(a => a.location === id);
   if (ambient.length) extras.push(`<button class="action-row" data-act="wander" data-loc="${id}" ${state.ap <= 0 ? 'disabled' : ''}><span class="action-name">${icon('search')}在附近转转</span><span class="action-desc">不一定发生什么，但廷根从不缺怪事。</span><span class="action-cost">1 行动</span></button>`);
   openModal(`<div class="modal wide location-modal">
     <div class="modal-head"><span class="head-icon" style="border-color:${loc.color};color:${loc.color}">${icon(loc.icon)}</span><div><h2>${esc(loc.name)}</h2><p class="modal-sub">${esc(loc.sub)} · 第 ${state.day} 天 · 剩余 ${state.ap} 行动</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
@@ -619,16 +663,25 @@ function locationFlavor(id) {
     docks: '码头区的风带着咸味和煤烟。仓库门半开着，有人在里面低声争论。',
     church: '彩窗把红月滤成碎玻璃。大祈祷厅里有人点蜡烛，地底的查尼斯门紧闭着。'
   };
-  return map[id] || '';
+  const backlund = {
+    lodging: '东区的出租屋很窄，窗外是永远晾不干的衣服和一层薄雾。',
+    detective: '事务所的招牌被雾打湿了。夏洛克在桌边摆弄一副塔罗牌，像在等一个不会准时来的人。',
+    west: '皇后区的街道干净得不像贝克兰德。马车经过时，窗帘后面有人看你。',
+    docks: '塔索克河的水是灰的。仓库、酒馆和没有灯的船挤在同一个河湾里。',
+    church: '黑夜教堂的彩窗把雾滤成灰色。告解室的门半掩着，里面没有声音。',
+    university: '贝克兰德大学的旧书库有霉味。管理员说，最里面那排书“不建议借阅”。'
+  };
+  return (state.region === 'backlund' ? backlund[id] : map[id]) || '';
 }
 function performAction(locId, actionId) {
   if (!state.player) return;
   if (state.ap <= 0) { toast('今天的行动点用完了。', 'danger'); return; }
-  const action = (DATA.actions[locId] || []).find(a => a.id === actionId);
+  const action = (regionActions()[locId] || []).find(a => a.id === actionId);
   if (!action) return;
   if (action.openBoard) { openCommissionBoard(); return; }
   if (action.retire) {
-    if (state.day < 8) { toast('你还没有攒够退出的勇气。第 8 天以后再来。', 'danger'); return; }
+    const gate = state.region === 'backlund' ? 4 : 8;
+    if (state.day < gate) { toast(`你还没有攒够退出的勇气。第 ${gate} 天以后再来。`, 'danger'); return; }
     openRetire(); return;
   }
   state.ap--;
@@ -670,7 +723,13 @@ function openRetire() {
 }
 function openFinal() {
   const candidates = endingCandidates(false);
-  openEndingChooser(candidates, '第 30 天结算', '你活到了第 30 天。廷根还在，你也还在。现在，你要怎么结算这一段人生？');
+  const canGo = state.region === 'tingen' && state.act === 1;
+  openEndingChooser(candidates,
+    state.region === 'backlund' ? '贝克兰德结算' : '廷根结算',
+    state.region === 'backlund'
+      ? '贝克兰德的雾还在。你活过了这 14 天，现在要决定，接下来用什么身份活下去。'
+      : '你活到了第 30 天。廷根还在，你也还在。你可以留在这里结算，也可以去贝克兰德继续追因斯。',
+    canGo);
 }
 function endingCandidates(retireOnly = false) {
   const p = state.player;
@@ -681,15 +740,22 @@ function endingCandidates(retireOnly = false) {
     if (e.cond.flags && e.cond.flags.every(f => state.flags[f])) list.push(e);
   }
   if (list.length) return list;
-  for (const e of DATA.endings.ordinary) {
+  const pool = regionEndings();
+  for (const e of pool.ordinary) {
+    if (e.region && e.region !== state.region) continue;
+    if (!e.region && state.region === 'backlund') continue;
     if (ordinaryOk(e)) list.push(e);
   }
   if (!retireOnly) {
-    for (const e of DATA.endings.core) {
+    for (const e of pool.core) {
+      if (e.region && e.region !== state.region) continue;
       if (coreOk(e)) list.push(e);
     }
   }
-  if (!list.length) list.push(DATA.endings.ordinary.find(e => e.id === 'daily'));
+  if (!list.length) {
+    const daily = pool.ordinary.find(e => e.id === (state.region === 'backlund' ? 'backlund_daily' : 'daily'));
+    list.push(daily || DATA.endings.ordinary.find(e => e.id === 'daily'));
+  }
   return list.slice(0, 8);
 }
 function ordinaryOk(e) {
@@ -717,12 +783,12 @@ function coreOk(e) {
   }
   return true;
 }
-function openEndingChooser(candidates, title, text) {
+function openEndingChooser(candidates, title, text, canGoBacklund = false) {
   const cards = candidates.map(e => `<button class="ending-choice" data-act="pick-ending" data-id="${e.id}"><span class="ending-choice-tag">${e.headline ? '结局' : ''}</span><b>${esc(e.title)}</b><small>${esc(e.headline || '')}</small><p>${esc((e.text || '').slice(0, 80))}…</p></button>`).join('');
   openModal(`<div class="modal wide">
-    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${esc(title)}</h2><p class="modal-sub">结局由你的选择、关系和廷根的状态结算</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${esc(title)}</h2><p class="modal-sub">结局由你的选择、关系和${regionLabel()}的状态结算</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><p class="scene-text">${esc(text)}</p><div class="ending-grid">${cards}</div></div>
-    <div class="modal-foot"><span class="small" style="color:#6d5740">结局会写入存档柜；可以重开或回书架。</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再想想</button></div>
+    <div class="modal-foot">${canGoBacklund ? `<button class="btn primary small" data-act="go-backlund">${icon('arrow')}前往贝克兰德 · 第二段</button>` : ''}<span class="small" style="color:#6d5740">结局会写入存档柜；可以重开或回书架。</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">再想想</button></div>
   </div>`);
 }
 
@@ -758,12 +824,12 @@ function canonChoices(e) {
   }
   return [
     { label: '旁观并记录', hint: '先看清楚发生了什么。', effects: { insight: 2 }, result: '你站在人群边缘，把看到的细节记在笔记本上。' },
-    { label: '以普通人身份接触', hint: '试着和当事人说一句话。', check: { attr: 'social', dc: 9 }, effects: { relations: { dunn: 1 }, insight: 1 }, result: '你说了一句很普通的话。对方放松了一点，告诉你一个不该告诉外人的细节。' },
+    { label: '以普通人身份接触', hint: '试着和当事人说一句话。', check: { attr: 'social', dc: 9 }, effects: { relations: state.region === 'backlund' ? { klein: 1 } : { dunn: 1 }, insight: 1 }, result: '你说了一句很普通的话。对方放松了一点，告诉你一个不该告诉外人的细节。' },
     { label: '直接介入', hint: '用非凡者的方式改变事件。', check: { attr: 'spirit', dc: 10 }, effects: { insight: 2, madness: 1 }, flag: 'intervened_' + e.id, result: '你伸出手。事件没有按原定的方向走，你也不知道这是好是坏。' }
   ];
 }
 function openCanon(id) {
-  const e = CANON.find(x => x.id === id);
+  const e = regionCanon().find(x => x.id === id);
   if (!e) return;
   if (state.ap <= 0) { toast('今天的行动点用完了。', 'danger'); return; }
   if (state.canonIntervened.includes(id)) { toast('这件事已经处理过了。', ''); return; }
@@ -780,7 +846,7 @@ function openCanon(id) {
   </div>`);
 }
 function chooseCanon(id, i) {
-  const e = CANON.find(x => x.id === id);
+  const e = regionCanon().find(x => x.id === id);
   if (!e || state.ap <= 0) return;
   const choices = canonChoices(e);
   const c = choices[i];
@@ -803,7 +869,7 @@ function chooseCanon(id, i) {
 function resolveCanonPending() {
   for (const id of state.pendingCanon) {
     if (!state.canonSeen.includes(id)) state.canonSeen.push(id);
-    const e = CANON.find(x => x.id === id);
+    const e = regionCanon().find(x => x.id === id);
     log(`canon：${e ? e.title : id} 按原定轨迹发生。`);
     if (e && e.id === 'v1-e12') state.flags.canon_final = true;
   }
@@ -813,7 +879,7 @@ function resolveCanonPending() {
 /* ---------- commissions ---------- */
 function openCommissionBoard() {
   const active = state.activeCommission;
-  const rows = DATA.commissions.map(c => {
+  const rows = regionCommissions().map(c => {
     const done = state.completedCommissions.includes(c.id);
     const isActive = active && active.id === c.id;
     return `<div class="commission-card ${done ? 'done' : ''} ${isActive ? 'active' : ''}">
@@ -824,14 +890,14 @@ function openCommissionBoard() {
     </div>`;
   }).join('');
   openModal(`<div class="modal wide">
-    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>委托板</h2><p class="modal-sub">黑荆棘 / 码头区 / 教会 · 一次只能接一个</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-head"><span class="head-icon">${icon('star')}</span><div><h2>${regionLabel()}委托板</h2><p class="modal-sub">${state.region === 'backlund' ? '侦探所 / 码头 / 大学 / 教堂' : '黑荆棘 / 码头区 / 教会'} · 一次只能接一个</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body"><div class="commission-grid">${rows}</div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">${active ? `进行中：${esc(active.title)}` : '没有进行中的委托'}</span><span class="spacer"></span><button class="btn ghost small" data-act="close-modal">收起</button></div>
   </div>`);
 }
 function acceptCommission(id) {
   if (state.activeCommission) { toast('你已经在处理一个委托了。', 'danger'); return; }
-  const c = DATA.commissions.find(x => x.id === id);
+  const c = regionCommissions().find(x => x.id === id);
   if (!c) return;
   state.activeCommission = Object.assign({}, c, { acceptedDay: state.day });
   log(`接受委托：${c.title}`);
@@ -897,17 +963,34 @@ function chooseNight(id) {
   resolveCanonPending();
   closeModal();
   if (checkFailure()) return;
-  if (state.day >= 30) { openFinal(); return; }
+  if (state.day >= state.maxDay) { openFinal(); return; }
   state.day++;
   checkCommissionDeadline();
   autoSave();
   startDay();
 }
+function startBacklund() {
+  state.region = 'backlund';
+  state.act = 2;
+  state.maxDay = 14;
+  state.day = 1;
+  state.ap = 2;
+  state.activeCommission = null;
+  state.pendingCanon = [];
+  state.newspaper = [];
+  state.ending = null;
+  const extra = (window.OC_BACKLUND && window.OC_BACKLUND.npcs) || [];
+  for (const n of extra) if (state.relations[n.id] === undefined) state.relations[n.id] = 0;
+  state.screen = 'hub';
+  log('交通：蒸汽列车抵达贝克兰德。');
+  autoSave();
+  startDay(true);
+  toast('第二段：贝克兰德。雾比廷根厚。', 'good');
+}
 
 /* ---------- endings ---------- */
 function showEnding(id) {
-  const all = [].concat(DATA.endings.ordinary, DATA.endings.core, DATA.endings.bad);
-  const e = all.find(x => x.id === id);
+  const e = endingById(id);
   if (!e) return;
   state.ending = id;
   state.screen = 'ending';
@@ -918,7 +1001,8 @@ function showEnding(id) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function endingById(id) {
-  return [].concat(DATA.endings.ordinary, DATA.endings.core, DATA.endings.bad).find(x => x.id === id);
+  const pool = regionEndings();
+  return [].concat(pool.ordinary, pool.core, pool.bad).find(x => x.id === id);
 }
 function renderEnding() {
   const e = endingById(state.ending) || DATA.endings.ordinary.find(x => x.id === 'daily');
@@ -959,7 +1043,14 @@ function endingQuote(e) {
     daily: '普通人的日常，也是一种胜利。',
     mad: '你终于听见了所有人的声音。',
     witness: '你见过他，但你没有说。',
-    sacrifice: '没有名字，也算活过。'
+    sacrifice: '没有名字，也算活过。',
+    backlund_reporter: '删掉的那一段，才是真的。',
+    backlund_detective: '雾里没有真话，只有价码。',
+    backlund_cafe: '杯子会转，客人不会问。',
+    backlund_scholar: '有些书，最好永远不借出去。',
+    backlund_philanthropist: '口罩挡不住雾，但能挡住一点绝望。',
+    backlund_socialite: '真事留给自己，在夜里慢慢想。',
+    backlund_daily: '雾散了，你还在这里。'
   };
   return quotes[e.id] || '廷根还在，你也还在。';
 }
@@ -967,7 +1058,7 @@ function endingQuote(e) {
 /* ---------- ambient ---------- */
 function wander(locId) {
   if (state.ap <= 0) { toast('今天的行动点用完了。', 'danger'); return; }
-  const pool = DATA.ambient.filter(a => a.location === locId);
+  const pool = regionAmbient().filter(a => a.location === locId);
   if (!pool.length) { toast('这里暂时没有什么可看的。', ''); return; }
   const rng = seeded(`${state.player.name}:${state.day}:wander:${locId}`);
   const amb = pool[Math.floor(rng() * pool.length)];
@@ -1024,7 +1115,7 @@ function renderSaves() {
   state.screen = 'saves';
   const all = saves.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   const cards = all.map(s => `<div class="oc-save-card" style="--c:${s.type === 'auto' ? '#8e2f3c' : '#c9a35c'}">
-    <div class="oc-save-top"><span>${s.type === 'auto' ? '自动档' : '手动档'}</span><span>第 ${s.day} / 30 天</span></div>
+    <div class="oc-save-top"><span>${s.type === 'auto' ? '自动档' : '手动档'}</span><span>${s.region === 'backlund' ? '贝克兰德' : '廷根'} · 第 ${s.day} / ${s.maxDay || 30} 天</span></div>
     <h3>${esc(s.name)}</h3>
     <p class="oc-save-sub">${esc(s.playerName)} · ${esc(s.pathway)} · 序列 ${s.sequence}</p>
     <p class="oc-save-summary">${esc(s.summary)}</p>
@@ -1045,6 +1136,7 @@ async function loadSave(id) {
   const s = saveById(id);
   if (!s) return;
   state = Object.assign(freshState(), JSON.parse(JSON.stringify(s.snapshot)));
+  state.maxDay = state.maxDay || (state.region === 'backlund' ? 14 : 30);
   state.screen = state.ending ? 'ending' : 'hub';
   state._lastTick = 0;
   sessionStart = Date.now();
@@ -1102,16 +1194,16 @@ function openSettings() {
       <div class="setting-row"><div><div class="s-label">字号</div><div class="s-desc">只影响文字，不改变地图布局。</div></div><div class="font-btns">${[1, 1.15, 1.3].map(v => `<button class="${settings.textScale === v ? 'on' : ''}" data-act="font-size" data-size="${v}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
       <div class="setting-row"><div><div class="s-label">减少动效</div><div class="s-desc">关闭长过渡与闪烁。</div></div><button class="switch ${settings.motion ? 'on' : ''}" data-act="toggle-motion"></button></div>
       <div class="setting-row"><div><div class="s-label">存档</div><div class="s-desc">导出 JSON，或从备份导入。</div></div><div style="display:flex;gap:5px"><button class="btn ghost small" data-act="export-saves">${icon('download')}导出</button><button class="btn ghost small" data-act="pick-import">${icon('upload')}导入</button></div></div>
-      <div class="setting-row"><div><div class="s-label">版本</div><div class="s-desc">廷根 30 天切片 · 12 个 canon 锚点 · 本地运行</div></div><span class="tag">v0.1</span></div>
+      <div class="setting-row"><div><div class="s-label">版本</div><div class="s-desc">廷根 30 天 + 贝克兰德 14 天 · 24 个 canon 锚点 · 本地运行</div></div><span class="tag">v0.2</span></div>
     </div></div>
     <div class="modal-foot"><span class="small" style="color:#6d5740">本作是 OC AU 同人；不含原作长段正文。</span><span class="spacer"></span><button class="btn primary small" data-act="close-modal">完成</button></div>
   </div>`, {});
 }
 function openAbout() {
   openModal(`<div class="modal">
-    <div class="modal-head"><span class="head-icon">${icon('moon')}</span><div><h2>廷根指南</h2><p class="modal-sub">OC AU · 30 天切片</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
+    <div class="modal-head"><span class="head-icon">${icon('moon')}</span><div><h2>廷根 / 贝克兰德指南</h2><p class="modal-sub">OC AU · 两段 44 天</p></div><button class="modal-close" data-act="close-modal">${icon('close')}</button></div>
     <div class="modal-body">
-      <p class="scene-text">你是一个原创非凡者。每天有 2 个行动点；读报纸，去地点，接委托，和 NPC 说话。canon 事件会在固定日期发生，你可以旁观、接触或直接介入。</p>
+      <p class="scene-text">你是一个原创非凡者。每天有 2 个行动点；读报纸，去地点，接委托，和 NPC 说话。canon 事件会在固定日期发生，你可以旁观、接触或直接介入。廷根第 30 天可以选择去贝克兰德，继续 14 天。</p>
       <div class="help-list">
         <div class="help-item"><span class="h-num">1</span><div><h4>报纸</h4><p>每天早上更新：canon 行踪、玩家影响、市井传闻。报纸可能滞后，也可能撒谎。</p></div></div>
         <div class="help-item"><span class="h-num">2</span><div><h4>判定</h4><p>属性 + d6。失败也会留下后果。占卜家/收尸人有特定判定加成。</p></div></div>
@@ -1124,7 +1216,7 @@ function openAbout() {
   </div>`);
 }
 function openNpc(id) {
-  const n = DATA.npcs.find(x => x.id === id);
+  const n = regionNPCs().find(x => x.id === id);
   if (!n) return;
   const r = state.relations[id] || 0;
   openModal(`<div class="modal narrow">
@@ -1134,7 +1226,7 @@ function openNpc(id) {
   </div>`);
 }
 function openRelations() {
-  const rows = DATA.npcs.map(n => {
+  const rows = regionNPCs().map(n => {
     const r = state.relations[n.id] || 0;
     return `<button class="relation-card" data-act="npc" data-id="${n.id}" style="--c:${n.color}"><span class="rel-avatar">${esc(n.name[0])}</span><span><b>${esc(n.name)}</b><small>${esc(n.role)} · ${relLabel(r)}</small></span><em>${r}</em></button>`;
   }).join('');
@@ -1181,7 +1273,7 @@ function init() {
     getScreen: () => state.screen,
     newGame, render, startDay, openLocation, performAction, openCanon, chooseCanon,
     openCommissionBoard, acceptCommission, resolveCommission, openFinal, showEnding,
-    saveGame, loadSave, day: () => state.day
+    startBacklund, saveGame, loadSave, day: () => state.day, region: () => state.region
   };
 }
 document.addEventListener('click', (e) => {
@@ -1218,6 +1310,7 @@ document.addEventListener('click', (e) => {
   if (act === 'end-day') { openNight(); return; }
   if (act === 'night-choice') { chooseNight(el.dataset.id); return; }
   if (act === 'pick-ending') { showEnding(el.dataset.id); return; }
+  if (act === 'go-backlund') { closeModal(); startBacklund(); return; }
   if (act === 'save') { openSaveDialog(); return; }
   if (act === 'save-to-slot') { saveToSlot(Number(el.dataset.slot)); return; }
   if (act === 'load-save') { loadSave(el.dataset.id); return; }
