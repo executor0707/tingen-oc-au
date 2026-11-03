@@ -3172,3 +3172,11 @@ body[data-theme="light"] .action-chance { color:#356d70; }
 body[data-theme="light"] .event-notice b { color:#1d1a15; }
 body[data-theme="light"] .event-notice small { color:#6d5740; }
 body[data-theme="light"] .identity-clue { color:#1d1a15; }
+/* final night contrast: lift the page off pure black */
+body[data-theme="dark"] { background:#202634; }
+body[data-theme="dark"][data-screen="hub"], body[data-theme="dark"][data-screen="creator"], body[data-theme="dark"][data-screen="saves"] { background:#202634; }
+body[data-theme="dark"] .oc-hud { background:rgba(37,44,58,.98); }
+body[data-theme="dark"] .loc-card { background:linear-gradient(145deg, #2a3242, #222a38); }
+body[data-theme="dark"] .loc-card:hover { background:linear-gradient(145deg, #303a4c, #252e3d); }
+body[data-theme="dark"] .profile-mini, body[data-theme="dark"] .relations-panel, body[data-theme="dark"] .log-panel, body[data-theme="dark"] .canon-card, body[data-theme="dark"] .active-commission { background:#252d3c; }
+body[data-theme="dark"] .icon-btn, body[data-theme="dark"] .res { background:#252d3c; }
